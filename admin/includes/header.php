@@ -7,6 +7,7 @@ admin_require();
 $adminTitle = $adminTitle ?? 'Dashboard';
 $adminSubtitle = $adminSubtitle ?? 'Gestao operacional da loja.';
 $adminUser = current_user();
+send_security_headers();
 ?>
 <!doctype html>
 <html lang="pt-PT">
@@ -14,8 +15,10 @@ $adminUser = current_user();
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= e($adminTitle) ?> | Administracao <?= e(APP_NAME) ?></title>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="dns-prefetch" href="//cdn.jsdelivr.net">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="<?= e(asset('css/main.css')) ?>">
+    <link rel="stylesheet" href="<?= e(versioned_asset('css/main.css')) ?>">
 </head>
 <body class="admin-layout">
 <div class="container-fluid">

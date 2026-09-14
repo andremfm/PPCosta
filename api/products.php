@@ -24,7 +24,7 @@ echo json_encode([
             'slug' => $product['slug'],
             'sku' => $product['sku'],
             'price' => format_price((float) $product['final_price']),
-            'url' => url('produto-detalhe.php?slug=' . urlencode($product['slug'])),
+            'url' => product_url($product['slug']),
         ];
     }, $products),
 ], JSON_UNESCAPED_UNICODE);

@@ -82,7 +82,7 @@ require_once __DIR__ . '/includes/header.php';
                                         <div class="d-flex justify-content-between gap-3">
                                             <div>
                                                 <h2 class="h5 fw-bold mb-1">
-                                                    <a class="text-dark text-decoration-none" href="<?= e(url('produto-detalhe.php?slug=' . urlencode($item['slug']))) ?>"><?= e($item['name']) ?></a>
+                                                    <a class="text-dark text-decoration-none" href="<?= e(product_url($item['slug'])) ?>"><?= e($item['name']) ?></a>
                                                 </h2>
                                                 <p class="text-secondary small mb-2">SKU: <?= e($item['sku']) ?></p>
                                             </div>

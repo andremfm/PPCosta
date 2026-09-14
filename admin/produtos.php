@@ -193,7 +193,7 @@ require_once __DIR__ . '/includes/header.php';
             <tbody>
             <?php foreach ($products as $product): ?>
                 <tr>
-                    <td><a href="<?= e(url('produto-detalhe.php?slug=' . urlencode($product['slug']))) ?>"><?= e($product['name']) ?></a></td>
+                    <td><a href="<?= e(product_url($product['slug'])) ?>"><?= e($product['name']) ?></a></td>
                     <td><?= e($product['sku']) ?></td>
                     <td><?= e($product['category_name'] ?? '-') ?></td>
                     <td><?= e(format_price((float) ($product['final_price'] ?? $product['price']))) ?></td>

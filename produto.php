@@ -1,5 +1,7 @@
 <?php
 $pageTitle = 'Catalogo | PPCosta';
+$pageDescription = 'Catalogo de artigos personalizados PPCosta para bebe, roupa, casa, empresas, brindes, bordados e estampagens.';
+$pageCanonical = url('produto.php');
 require_once __DIR__ . '/includes/catalog.php';
 
 $filters = catalog_filters_from_request();
@@ -78,7 +80,7 @@ require_once __DIR__ . '/includes/header.php';
                 <?php foreach ($products as $product): ?>
                     <div class="col-sm-6 col-xl-3">
                         <article class="product-card h-100 overflow-hidden">
-                            <a class="product-media <?= e($product['media_class'] ?? 'product-mug') ?>" href="<?= e(url('produto-detalhe.php?slug=' . urlencode($product['slug']))) ?>">
+                            <a class="product-media <?= e($product['media_class'] ?? 'product-mug') ?>" href="<?= e(product_url($product['slug'])) ?>">
                                 <span><?= e($product['category_name'] ?? 'Produto') ?></span>
                             </a>
                             <div class="p-3">
@@ -94,7 +96,7 @@ require_once __DIR__ . '/includes/header.php';
                                     <?php endif; ?>
                                 </div>
                                 <h2 class="h6 fw-bold">
-                                    <a class="text-dark text-decoration-none" href="<?= e(url('produto-detalhe.php?slug=' . urlencode($product['slug']))) ?>">
+                                    <a class="text-dark text-decoration-none" href="<?= e(product_url($product['slug'])) ?>">
                                         <?= e($product['name']) ?>
                                     </a>
                                 </h2>
@@ -106,8 +108,8 @@ require_once __DIR__ . '/includes/header.php';
                                     <?php endif; ?>
                                 </div>
                                 <div class="d-flex gap-2">
-                                    <a class="btn btn-sm btn-outline-dark flex-fill" href="<?= e(url('produto-detalhe.php?slug=' . urlencode($product['slug']))) ?>">Ver</a>
-                                    <a class="btn btn-sm btn-dark flex-fill" href="<?= e(url('produto-detalhe.php?slug=' . urlencode($product['slug']))) ?>">Personalizar</a>
+                                    <a class="btn btn-sm btn-outline-dark flex-fill" href="<?= e(product_url($product['slug'])) ?>">Ver</a>
+                                    <a class="btn btn-sm btn-dark flex-fill" href="<?= e(product_url($product['slug'])) ?>">Personalizar</a>
                                 </div>
                             </div>
                         </article>

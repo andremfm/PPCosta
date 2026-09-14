@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/includes/personalization.php';
+require_once __DIR__ . '/includes/seo.php';
 
 $slug = trim($_GET['slug'] ?? '');
 $product = $slug !== '' ? catalog_product_by_slug($slug) : null;
@@ -25,6 +26,16 @@ if (!$product) {
 
 $pageTitle = $product['name'] . ' | PPCosta';
 $pageDescription = $product['short_description'] ?? 'Produto personalizado PPCosta.';
+$pageCanonical = product_url((string) $product['slug']);
+$pageType = 'product';
+$pageSchema = [
+    seo_product_schema($product),
+    seo_breadcrumb_schema([
+        ['name' => 'Inicio', 'url' => url()],
+        ['name' => 'Produtos', 'url' => url('produto.php')],
+        ['name' => (string) $product['name'], 'url' => product_url((string) $product['slug'])],
+    ]),
+];
 $personalizationRules = !empty($product['is_personalizable'])
     ? personalization_rules_for_product((int) $product['id'])
     : [];

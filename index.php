@@ -1,6 +1,10 @@
 <?php
+require_once __DIR__ . '/includes/seo.php';
+
 $pageTitle = 'PPCosta | Artigos personalizados';
 $pageDescription = 'Loja online de artigos personalizados, bordados, estampagens e brindes empresariais.';
+$pageCanonical = url();
+$pageSchema = seo_organization_schema();
 require_once __DIR__ . '/includes/header.php';
 
 $categories = [
@@ -95,7 +99,7 @@ $reviews = [
         <div class="row g-3">
             <?php foreach ($categories as $category): ?>
                 <div class="col-6 col-lg-2">
-                    <a class="category-tile h-100 p-3 p-md-4 text-decoration-none" href="<?= e(url('produto.php?categoria=' . urlencode(strtolower($category[0])))) ?>">
+                    <a class="category-tile h-100 p-3 p-md-4 text-decoration-none" href="<?= e(category_url(strtolower($category[0]))) ?>">
                         <span class="category-icon <?= e($category[2]) ?>"></span>
                         <h3 class="h6 fw-bold mb-1 text-dark"><?= e($category[0]) ?></h3>
                         <span class="text-secondary small"><?= e($category[1]) ?></span>
@@ -180,7 +184,7 @@ $reviews = [
                 <div class="promo-panel">
                     <span>Desde</span>
                     <strong>25 unidades</strong>
-                    <a class="btn btn-light w-100 mt-3" href="<?= e(url('produto.php?categoria=empresas')) ?>">Ver produtos empresariais</a>
+                    <a class="btn btn-light w-100 mt-3" href="<?= e(category_url('empresas')) ?>">Ver produtos empresariais</a>
                 </div>
             </div>
         </div>

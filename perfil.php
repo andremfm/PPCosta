@@ -236,7 +236,7 @@ require_once __DIR__ . '/includes/header.php';
                     <div class="row g-3">
                         <?php foreach ($wishlist as $item): ?>
                             <div class="col-md-4">
-                                <a class="list-card h-100" href="<?= e(url('produto-detalhe.php?slug=' . urlencode($item['slug']))) ?>">
+                                <a class="list-card h-100" href="<?= e(product_url($item['slug'])) ?>">
                                     <span><strong><?= e($item['name']) ?></strong><small><?= e($item['sku']) ?></small></span>
                                     <b><?= e(format_price((float) $item['final_price'])) ?></b>
                                 </a>

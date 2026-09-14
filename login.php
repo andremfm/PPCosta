@@ -22,8 +22,15 @@ if (request_method() === 'POST') {
         redirect('login.php');
     }
 
+    $rateLimitKey = 'login|' . strtolower($email) . '|' . ($_SERVER['REMOTE_ADDR'] ?? 'local');
+    if (!rate_limit_allow($rateLimitKey)) {
+        flash('danger', 'Demasiadas tentativas. Aguarda alguns minutos antes de voltar a tentar.');
+        redirect('login.php');
+    }
+
     try {
         if (login_user($email, $password)) {
+            rate_limit_clear($rateLimitKey);
             clear_old();
             flash('success', 'Sessao iniciada com sucesso.');
             redirect(has_role('admin') ? 'admin/' : 'perfil.php');

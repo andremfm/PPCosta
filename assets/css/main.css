@@ -991,6 +991,42 @@ body {
     gap: 24px;
 }
 
+.admin-bar-chart {
+    display: grid;
+    gap: 14px;
+}
+
+.admin-bar-row {
+    display: grid;
+    grid-template-columns: 140px 1fr 110px;
+    align-items: center;
+    gap: 12px;
+}
+
+.admin-bar-row span {
+    color: var(--color-muted);
+    font-weight: 700;
+}
+
+.admin-bar-row div {
+    height: 10px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #e5e7eb;
+}
+
+.admin-bar-row i {
+    display: block;
+    height: 100%;
+    min-width: 4px;
+    border-radius: inherit;
+    background: var(--color-accent);
+}
+
+.admin-bar-row strong {
+    text-align: right;
+}
+
 .admin-dark {
     color: #e5e7eb;
     background: #020617;
@@ -1081,6 +1117,14 @@ body {
 
     .admin-grid-2 {
         grid-template-columns: 1fr;
+    }
+
+    .admin-bar-row {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-bar-row strong {
+        text-align: left;
     }
 
     .trust-item {

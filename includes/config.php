@@ -17,7 +17,7 @@ define('DB_HOST', env_value('DB_HOST', '127.0.0.1'));
 define('DB_PORT', (int) env_value('DB_PORT', '3306'));
 define('DB_NAME', env_value('DB_NAME', 'ppcosta_store'));
 define('DB_USER', env_value('DB_USER', 'root'));
-define('DB_PASS', env_value('DB_PASS', ''));
+define('DB_PASS', env_value('DB_PASS', 'Andre-slb317'));
 define('DB_CHARSET', env_value('DB_CHARSET', 'utf8mb4'));
 
 define('UPLOAD_DIR', env_value('UPLOAD_DIR', __DIR__ . '/../uploads'));

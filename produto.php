@@ -1,8 +1,9 @@
 <?php
+require_once __DIR__ . '/includes/catalog.php';
+
 $pageTitle = 'Catalogo | PPCosta';
 $pageDescription = 'Catalogo de artigos personalizados PPCosta para bebe, roupa, casa, empresas, brindes, bordados e estampagens.';
 $pageCanonical = url('produto.php');
-require_once __DIR__ . '/includes/catalog.php';
 
 $filters = catalog_filters_from_request();
 $categories = catalog_categories();

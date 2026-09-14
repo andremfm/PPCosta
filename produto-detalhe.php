@@ -3,6 +3,14 @@ require_once __DIR__ . '/includes/personalization.php';
 require_once __DIR__ . '/includes/seo.php';
 
 $slug = trim($_GET['slug'] ?? '');
+
+if ($slug === '') {
+    $path = trim((string) parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH), '/');
+    if (str_starts_with($path, 'produto/')) {
+        $slug = trim(substr($path, strlen('produto/')), '/');
+    }
+}
+
 $product = $slug !== '' ? catalog_product_by_slug($slug) : null;
 
 if (!$product) {

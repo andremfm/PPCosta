@@ -36,6 +36,12 @@ php tests/run.php
 php sitemap.php
 ```
 
+Para testar localmente com URLs amigaveis:
+
+```bash
+php -S 127.0.0.1:8000 router.php
+```
+
 Abrir `https://dominio-final/api/health.php` e confirmar:
 
 - `status: ok`

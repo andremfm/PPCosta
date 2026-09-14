@@ -16,6 +16,7 @@ Fase 19 concluida: estrutura de pastas, base de dados SQL, autenticacao, FrontOf
 - Otimizacoes: assets versionados, scripts diferidos, preconnect/dns-prefetch, cache HTTP para assets e compressao Apache.
 - Seguranca: headers HTTP em PHP e Apache, CSP, HSTS em HTTPS, rate limit no login, protecao de uploads, CSRF e sessoes seguras.
 - Producao: configuracao por variaveis de ambiente, `.env.example`, health check expandido e guia em `docs/PRODUCTION.md`.
+- Desenvolvimento local: `router.php` permite testar URLs amigaveis com o servidor PHP embutido.
 
 ## Proximas fases
 

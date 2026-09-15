@@ -120,5 +120,6 @@ function admin_nav_items(): array
         ['label' => 'Stock', 'href' => 'admin/stock.php', 'match' => 'stock.php'],
         ['label' => 'Relatorios', 'href' => 'admin/relatorios.php', 'match' => 'relatorios.php'],
         ['label' => 'Personalizacao', 'href' => 'admin/personalizacao.php', 'match' => 'personalizacao.php'],
+        ['label' => 'Configuracoes', 'href' => 'admin/configuracoes.php', 'match' => 'configuracoes.php'],
     ];
 }

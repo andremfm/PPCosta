@@ -26,6 +26,7 @@ Executar por ordem:
 mysql -u utilizador -p < database/001_schema.sql
 mysql -u utilizador -p ppcosta_store < database/002_seed.sql
 mysql -u utilizador -p ppcosta_store < database/003_views_triggers_procedures.sql
+mysql -u utilizador -p ppcosta_store < database/004_payments.sql
 ```
 
 ## Validacao antes de publicar

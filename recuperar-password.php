@@ -1,6 +1,7 @@
 <?php
 $pageTitle = 'Recuperar password | PPCosta';
 require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/includes/mailer.php';
 
 if (request_method() === 'POST') {
     $email = trim($_POST['email'] ?? '');
@@ -17,6 +18,9 @@ if (request_method() === 'POST') {
 
     try {
         $token = create_password_reset($email);
+        if ($token) {
+            mailer_send_password_reset($email, $token);
+        }
         flash('success', 'Se o email existir, receberas instrucoes para definir uma nova password.');
 
         if ($token && APP_ENV === 'development') {

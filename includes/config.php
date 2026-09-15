@@ -22,6 +22,10 @@ define('DB_CHARSET', env_value('DB_CHARSET', 'utf8mb4'));
 
 define('UPLOAD_DIR', env_value('UPLOAD_DIR', __DIR__ . '/../uploads'));
 define('MAX_UPLOAD_BYTES', (int) env_value('MAX_UPLOAD_BYTES', (string) (10 * 1024 * 1024)));
+define('MAIL_FROM_EMAIL', env_value('MAIL_FROM_EMAIL', 'no-reply@ppcosta.local'));
+define('MAIL_FROM_NAME', env_value('MAIL_FROM_NAME', APP_NAME));
+define('MAIL_TRANSPORT', env_value('MAIL_TRANSPORT', APP_ENV === 'production' ? 'mail' : 'log'));
+define('MAIL_LOG_DIR', env_value('MAIL_LOG_DIR', __DIR__ . '/../uploads/mail'));
 
 date_default_timezone_set(env_value('APP_TIMEZONE', 'Europe/Lisbon'));
 

@@ -1,6 +1,7 @@
 <?php
 $pageTitle = 'Encomenda concluida | PPCosta';
 require_once __DIR__ . '/includes/checkout.php';
+require_once __DIR__ . '/includes/payments.php';
 
 $order = $_SESSION['last_order'] ?? null;
 
@@ -9,6 +10,7 @@ if (!$order) {
 }
 
 require_once __DIR__ . '/includes/header.php';
+$payment = $order['payment'] ?? (!empty($order['id']) ? payment_for_order((int) $order['id']) : null);
 ?>
 <section class="section-pad">
     <div class="container">
@@ -24,6 +26,9 @@ require_once __DIR__ . '/includes/header.php';
                     <div class="stat-card p-4 h-100">
                         <h2 class="h6 fw-bold">Pagamento</h2>
                         <p class="text-secondary mb-0"><?= e($order['payment_method']['name']) ?></p>
+                        <?php if ($payment): ?>
+                            <small class="text-secondary d-block mt-2"><?= e(payment_status_label((string) $payment['status'])) ?></small>
+                        <?php endif; ?>
                     </div>
                 </div>
                 <div class="col-md-4">
@@ -39,6 +44,15 @@ require_once __DIR__ . '/includes/header.php';
                     </div>
                 </div>
             </div>
+            <?php if ($payment): ?>
+                <div class="alert alert-light border text-start mt-4">
+                    <strong>Instrucao de pagamento</strong>
+                    <p class="mb-1 mt-2"><?= e((string) $payment['instructions']) ?></p>
+                    <?php if (!empty($payment['reference'])): ?>
+                        <p class="mb-0"><strong>Referencia:</strong> <?= e((string) $payment['reference']) ?></p>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
             <div class="d-flex flex-wrap justify-content-center gap-2 mt-4">
                 <a class="btn btn-dark" href="<?= e(url('produto.php')) ?>">Continuar a comprar</a>
                 <a class="btn btn-outline-dark" href="<?= e(url('perfil.php')) ?>">Area cliente</a>

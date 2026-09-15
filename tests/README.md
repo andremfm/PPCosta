@@ -14,3 +14,9 @@ Teste HTTP completo com BD e servidor local:
 php -S 127.0.0.1:8000 router.php
 php tests/e2e_http.php
 ```
+
+Limpar clientes/encomendas QA criados pelos testes:
+
+```bash
+php tests/cleanup_qa.php
+```

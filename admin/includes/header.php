@@ -7,6 +7,7 @@ admin_require();
 $adminTitle = $adminTitle ?? 'Dashboard';
 $adminSubtitle = $adminSubtitle ?? 'Gestao operacional da loja.';
 $adminUser = current_user();
+$flashMessages = consume_flash();
 send_security_headers();
 ?>
 <!doctype html>
@@ -42,3 +43,10 @@ send_security_headers();
                     <button class="btn btn-dark" type="button" data-admin-theme-toggle>Modo escuro</button>
                 </div>
             </div>
+            <?php if ($flashMessages !== []): ?>
+                <?php foreach ($flashMessages as $message): ?>
+                    <div class="alert alert-<?= e($message['type']) ?> mb-3" role="alert">
+                        <?= e($message['message']) ?>
+                    </div>
+                <?php endforeach; ?>
+            <?php endif; ?>

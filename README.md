@@ -17,6 +17,9 @@ Fase 19 concluida: estrutura de pastas, base de dados SQL, autenticacao, FrontOf
 - Seguranca: headers HTTP em PHP e Apache, CSP, HSTS em HTTPS, rate limit no login, protecao de uploads, CSRF e sessoes seguras.
 - Producao: configuracao por variaveis de ambiente, `.env.example`, health check expandido e guia em `docs/PRODUCTION.md`.
 - Desenvolvimento local: `router.php` permite testar URLs amigaveis com o servidor PHP embutido.
+- Emails: modulo transacional em `includes/mailer.php`, com log local em desenvolvimento e `mail()` em producao.
+- QA: teste E2E HTTP em `tests/e2e_http.php` e limpeza em `tests/cleanup_qa.php`.
+- Pagamentos: camada modular em `includes/payments.php`, transacoes em `payment_transactions` e migration `database/004_payments.sql`.
 
 ## Proximas fases
 

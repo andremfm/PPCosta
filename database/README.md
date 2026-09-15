@@ -7,6 +7,7 @@ Scripts SQL para MySQL/MariaDB.
 1. `001_schema.sql`
 2. `002_seed.sql`
 3. `003_views_triggers_procedures.sql`
+4. `004_payments.sql`
 
 ## Notas
 

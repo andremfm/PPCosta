@@ -3,28 +3,28 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/cart.php';
 require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/payments.php';
+require_once __DIR__ . '/settings.php';
 
 function checkout_shipping_methods(): array
 {
-    return [
+    $fallback = [
         'ctt' => ['name' => 'CTT', 'price' => 4.90],
         'dpd' => ['name' => 'DPD', 'price' => 5.90],
+        'mrw' => ['name' => 'MRW', 'price' => 5.90],
+        'gls' => ['name' => 'GLS', 'price' => 5.90],
+        'dhl' => ['name' => 'DHL', 'price' => 7.90],
+        'ups' => ['name' => 'UPS', 'price' => 7.90],
         'pickup' => ['name' => 'Levantamento em loja', 'price' => 0.00],
         'free_shipping' => ['name' => 'Portes gratuitos', 'price' => 0.00],
     ];
+
+    return store_active_methods('shipping_methods', $fallback);
 }
 
 function checkout_payment_methods(): array
 {
-    return [
-        'mbway' => 'MB Way',
-        'multibanco' => 'Multibanco',
-        'paypal' => 'PayPal',
-        'stripe' => 'Stripe',
-        'card' => 'Cartao',
-        'bank_transfer' => 'Transferencia Bancaria',
-        'cash_on_delivery' => 'Contra Reembolso',
-    ];
+    return payment_active_methods();
 }
 
 function checkout_validate(array $data): array
@@ -79,7 +79,9 @@ function checkout_prepare_order(array $data): array
     $shippingMethods = checkout_shipping_methods();
     $shippingMethod = $shippingMethods[$data['shipping_method']];
 
-    if (($cart['coupon']['type'] ?? '') !== 'free_shipping' && $totals['subtotal'] < 75) {
+    $freeShippingThreshold = (float) store_setting('free_shipping_threshold', '75');
+
+    if (($cart['coupon']['type'] ?? '') !== 'free_shipping' && $totals['subtotal'] < $freeShippingThreshold) {
         $totals['shipping'] = (float) $shippingMethod['price'];
         $totals['total'] = max(0, $totals['subtotal'] - $totals['discount'] + $totals['shipping']);
     }
@@ -203,6 +205,7 @@ function checkout_store_order(array $order): array
             checkout_store_order_item_personalizations($orderItemId, $item);
         }
 
+        $order['payment'] = payment_create_for_order($orderId, $order);
         $pdo->commit();
         $order['id'] = $orderId;
         $order['persisted'] = true;

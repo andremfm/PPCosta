@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/admin.php';
 require_once __DIR__ . '/checkout.php';
+require_once __DIR__ . '/mailer.php';
 
 function admin_order_statuses(): array
 {
@@ -250,6 +251,12 @@ function admin_order_update_status(string|int $id, string $status, string $note 
         }
 
         $pdo->commit();
+        $stmt = db()->prepare('SELECT * FROM orders WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $orderId]);
+        $order = $stmt->fetch();
+        if ($order) {
+            mailer_send_order_status_update($order, admin_order_status_label($status), $note);
+        }
         return;
     } catch (Throwable) {
         if (isset($pdo) && $pdo->inTransaction()) {

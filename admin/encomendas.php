@@ -2,6 +2,7 @@
 $adminTitle = 'Encomendas';
 $adminSubtitle = 'Estados, linha temporal, producao, cliente, moradas e itens.';
 require_once __DIR__ . '/../includes/admin_orders.php';
+require_once __DIR__ . '/../includes/payments.php';
 admin_require();
 
 $filters = [
@@ -97,6 +98,7 @@ require_once __DIR__ . '/includes/header.php';
     $items = admin_order_items($orderId);
     $addresses = admin_order_addresses($orderId);
     $timeline = admin_order_timeline($orderId);
+    $payment = is_numeric((string) $orderId) ? payment_for_order((int) $orderId) : null;
     ?>
     <section class="admin-grid-2 mb-4">
         <div class="admin-panel">
@@ -130,6 +132,9 @@ require_once __DIR__ . '/includes/header.php';
                 <article><strong>Descontos</strong><span><?= e(format_price((float) $selectedOrder['discount_total'])) ?></span></article>
                 <article><strong>Portes</strong><span><?= e(format_price((float) $selectedOrder['shipping_total'])) ?></span></article>
                 <article><strong>IVA</strong><span><?= e(format_price((float) $selectedOrder['tax_total'])) ?></span></article>
+                <?php if ($payment): ?>
+                    <article><strong>Pagamento</strong><span><?= e(payment_status_label((string) $payment['status'])) ?> · <?= e((string) $payment['reference']) ?></span></article>
+                <?php endif; ?>
             </div>
         </div>
     </section>

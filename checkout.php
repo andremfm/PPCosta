@@ -1,6 +1,7 @@
 <?php
 $pageTitle = 'Checkout | PPCosta';
 require_once __DIR__ . '/includes/checkout.php';
+require_once __DIR__ . '/includes/mailer.php';
 
 $cart = cart();
 
@@ -27,6 +28,7 @@ if (request_method() === 'POST') {
 
     $order = checkout_store_order(checkout_prepare_order($_POST));
     $_SESSION['last_order'] = $order;
+    mailer_send_order_confirmation($order);
     if (!empty($_SESSION['user_id'])) {
         $_SESSION[customer_session_key('orders')][] = $order;
     }

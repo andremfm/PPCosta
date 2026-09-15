@@ -65,6 +65,7 @@ function e2e_assert(bool $condition, string $message): void
 
 try {
     e2e_assert(db_available(), 'Base de dados disponivel');
+    e2e_ensure_admin($adminEmail, $adminPassword);
 
     $register = e2e_request('GET', $baseUrl . '/register.php', null, $cookieFile);
     e2e_assert($register['status'] === 200, 'Pagina de registo responde');
@@ -150,6 +151,10 @@ try {
     $timelineStmt->execute(['order_id' => (int) $order['id']]);
     e2e_assert((int) $timelineStmt->fetchColumn() > 0, 'Linha temporal da encomenda criada');
 
+    $paymentStmt = db()->prepare('SELECT COUNT(*) FROM payment_transactions WHERE order_id = :order_id');
+    $paymentStmt->execute(['order_id' => (int) $order['id']]);
+    e2e_assert((int) $paymentStmt->fetchColumn() > 0, 'Transacao de pagamento criada');
+
     $adminLogin = e2e_request('GET', $baseUrl . '/login.php', null, $adminCookieFile);
     $adminToken = e2e_token($adminLogin['body']);
     $adminLoginPost = e2e_request('POST', $baseUrl . '/login.php', [
@@ -173,5 +178,47 @@ try {
     }
     if (is_string($adminCookieFile) && is_file($adminCookieFile)) {
         unlink($adminCookieFile);
+    }
+}
+
+function e2e_ensure_admin(string $email, string $password): void
+{
+    $pdo = db();
+    $pdo->beginTransaction();
+
+    try {
+        $stmt = $pdo->prepare('SELECT id FROM users WHERE email = :email LIMIT 1');
+        $stmt->execute(['email' => $email]);
+        $userId = $stmt->fetchColumn();
+
+        if (!$userId) {
+            $insert = $pdo->prepare(
+                'INSERT INTO users (first_name, last_name, email, password_hash, status, newsletter_opt_in)
+                 VALUES (:first_name, :last_name, :email, :password_hash, "active", 0)'
+            );
+            $insert->execute([
+                'first_name' => 'QA',
+                'last_name' => 'Admin',
+                'email' => $email,
+                'password_hash' => password_hash($password, PASSWORD_DEFAULT),
+            ]);
+            $userId = (int) $pdo->lastInsertId();
+        }
+
+        foreach (['admin', 'customer'] as $role) {
+            $roleStmt = $pdo->prepare('SELECT id FROM roles WHERE slug = :slug LIMIT 1');
+            $roleStmt->execute(['slug' => $role]);
+            $roleId = $roleStmt->fetchColumn();
+
+            if ($roleId) {
+                $pdo->prepare('INSERT IGNORE INTO user_roles (user_id, role_id) VALUES (:user_id, :role_id)')
+                    ->execute(['user_id' => (int) $userId, 'role_id' => (int) $roleId]);
+            }
+        }
+
+        $pdo->commit();
+    } catch (Throwable $exception) {
+        $pdo->rollBack();
+        throw $exception;
     }
 }

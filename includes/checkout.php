@@ -179,10 +179,10 @@ function checkout_store_order(array $order): array
 
         $itemStmt = $pdo->prepare(
             'INSERT INTO order_items (
-                order_id, product_id, product_name, sku, quantity, unit_price,
+                order_id, product_id, variation_id, product_name, sku, quantity, unit_price,
                 personalization_total, tax_rate, line_total
              ) VALUES (
-                :order_id, :product_id, :product_name, :sku, :quantity, :unit_price,
+                :order_id, :product_id, :variation_id, :product_name, :sku, :quantity, :unit_price,
                 :personalization_total, :tax_rate, :line_total
              )'
         );
@@ -192,6 +192,7 @@ function checkout_store_order(array $order): array
             $itemStmt->execute([
                 'order_id' => $orderId,
                 'product_id' => $item['product_id'],
+                'variation_id' => $item['variation_id'] ?? null,
                 'product_name' => $item['name'],
                 'sku' => $item['sku'],
                 'quantity' => $item['quantity'],

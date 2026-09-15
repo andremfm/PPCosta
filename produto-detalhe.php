@@ -48,6 +48,8 @@ $pageSchema = [
 $personalizationRules = !empty($product['is_personalizable'])
     ? personalization_rules_for_product((int) $product['id'])
     : [];
+$productImages = catalog_product_images((int) $product['id']);
+$productVariations = catalog_product_variations((int) $product['id']);
 $productReviews = reviews_for_product((int) $product['id']);
 $reviewSummary = review_summary_for_product((int) $product['id']);
 require_once __DIR__ . '/includes/header.php';
@@ -63,15 +65,27 @@ require_once __DIR__ . '/includes/header.php';
         </nav>
         <div class="row g-5">
             <div class="col-lg-6">
-                <div class="product-gallery-main <?= e($product['media_class'] ?? 'product-mug') ?>" data-personalization-preview>
-                    <span data-preview-product><?= e($product['category_name'] ?? 'Produto') ?></span>
+                <div class="product-gallery-main <?= $productImages !== [] ? 'has-image' : e($product['media_class'] ?? 'product-mug') ?>" data-personalization-preview>
+                    <?php if ($productImages !== []): ?>
+                        <img src="<?= e(url((string) $productImages[0]['path'])) ?>" alt="<?= e((string) ($productImages[0]['alt_text'] ?: $product['name'])) ?>">
+                    <?php else: ?>
+                        <span data-preview-product><?= e($product['category_name'] ?? 'Produto') ?></span>
+                    <?php endif; ?>
                     <strong data-preview-text></strong>
                     <small data-preview-meta></small>
                 </div>
                 <div class="product-gallery-thumbs mt-3">
-                    <button type="button" aria-label="Imagem principal"></button>
-                    <button type="button" aria-label="Detalhe do produto"></button>
-                    <button type="button" aria-label="Personalizacao"></button>
+                    <?php if ($productImages !== []): ?>
+                        <?php foreach (array_slice($productImages, 0, 3) as $image): ?>
+                            <button type="button" aria-label="<?= e((string) ($image['alt_text'] ?: $product['name'])) ?>">
+                                <img src="<?= e(url((string) $image['path'])) ?>" alt="">
+                            </button>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <button type="button" aria-label="Imagem principal"></button>
+                        <button type="button" aria-label="Detalhe do produto"></button>
+                        <button type="button" aria-label="Personalizacao"></button>
+                    <?php endif; ?>
                 </div>
             </div>
             <div class="col-lg-6">
@@ -106,6 +120,23 @@ require_once __DIR__ . '/includes/header.php';
                     <input type="hidden" name="action" value="add">
                     <input type="hidden" name="product_id" value="<?= e((string) $product['id']) ?>">
                     <input type="hidden" name="uploaded_personalization_file" value="" data-uploaded-personalization-file>
+                    <?php if ($productVariations !== []): ?>
+                        <div class="mb-4">
+                            <label class="form-label" for="variation_id">Opcao do produto</label>
+                            <select class="form-select" id="variation_id" name="variation_id" data-variation-select>
+                                <option value="" data-price-delta="0">Escolher opcao</option>
+                                <?php foreach ($productVariations as $variation): ?>
+                                    <option value="<?= e((string) $variation['id']) ?>" data-price-delta="<?= e((string) $variation['price_delta']) ?>">
+                                        <?= e((string) ($variation['attributes_label'] ?: $variation['sku'])) ?>
+                                        <?php if ((float) $variation['price_delta'] !== 0.0): ?>
+                                            <?= (float) $variation['price_delta'] > 0 ? '+' : '' ?><?= e(format_price((float) $variation['price_delta'])) ?>
+                                        <?php endif; ?>
+                                        · stock <?= e((string) $variation['stock']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    <?php endif; ?>
                     <?php if ($personalizationRules !== []): ?>
                         <div class="personalization-editor mb-4">
                             <div class="d-flex justify-content-between align-items-start gap-3 mb-3">

@@ -53,8 +53,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const totalOutput = personalizationForm.querySelector('[data-personalization-total]');
         const uploadedFileInput = personalizationForm.querySelector('[data-uploaded-personalization-file]');
         const uploadMessage = personalizationForm.querySelector('[data-upload-message]');
+        const variationSelect = personalizationForm.querySelector('[data-variation-select]');
         const basePrice = Number.parseFloat(personalizationForm.dataset.productPrice || '0');
         const productId = Number.parseInt(personalizationForm.dataset.productId || '0', 10);
+        const currentBasePrice = () => {
+            const selectedVariation = variationSelect?.selectedOptions?.[0];
+            return basePrice + Number.parseFloat(selectedVariation?.dataset.priceDelta || '0');
+        };
 
         const collectValues = () => {
             const values = {};
@@ -117,7 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 body: JSON.stringify({
                     product_id: productId,
-                    base_price: basePrice,
+                    base_price: currentBasePrice(),
                     values: collectValues(),
                 }),
             })
@@ -155,12 +160,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
 
                     if (totalOutput) {
-                        totalOutput.textContent = `${(basePrice + localExtra).toFixed(2).replace('.', ',')} EUR`;
+                        totalOutput.textContent = `${(currentBasePrice() + localExtra).toFixed(2).replace('.', ',')} EUR`;
                     }
                 });
         };
 
-        personalizationForm.querySelectorAll('[data-personalization-field], [data-personalization-file]').forEach((field) => {
+        personalizationForm.querySelectorAll('[data-personalization-field], [data-personalization-file], [data-variation-select]').forEach((field) => {
             field.addEventListener('input', () => {
                 updatePreview();
                 updatePrice();

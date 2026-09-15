@@ -15,7 +15,8 @@ if (request_method() === 'POST') {
             (int) ($_POST['product_id'] ?? 0),
             max(1, (int) ($_POST['quantity'] ?? 1)),
             is_array($_POST['personalization'] ?? null) ? $_POST['personalization'] : [],
-            trim($_POST['uploaded_personalization_file'] ?? '')
+            trim($_POST['uploaded_personalization_file'] ?? ''),
+            (int) ($_POST['variation_id'] ?? 0)
         );
 
         flash($added ? 'success' : 'danger', $added ? 'Produto adicionado ao carrinho.' : 'Nao foi possivel adicionar o produto.');
@@ -85,6 +86,9 @@ require_once __DIR__ . '/includes/header.php';
                                                     <a class="text-dark text-decoration-none" href="<?= e(product_url($item['slug'])) ?>"><?= e($item['name']) ?></a>
                                                 </h2>
                                                 <p class="text-secondary small mb-2">SKU: <?= e($item['sku']) ?></p>
+                                                <?php if (!empty($item['variation_label'])): ?>
+                                                    <p class="text-secondary small mb-2"><?= e((string) $item['variation_label']) ?></p>
+                                                <?php endif; ?>
                                             </div>
                                             <strong><?= e(format_price(((float) $item['unit_price'] + (float) $item['personalization_total']) * (int) $item['quantity'])) ?></strong>
                                         </div>

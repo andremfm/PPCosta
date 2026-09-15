@@ -117,7 +117,11 @@ function home_take_products(array $products, callable $filter, int $limit): arra
                 <div class="col-sm-6 col-xl-3">
                     <article class="product-card h-100 overflow-hidden">
                         <a class="product-media <?= e($product['media_class'] ?? 'product-mug') ?>" href="<?= e(product_url((string) $product['slug'])) ?>">
-                            <span><?= e((string) ($product['category_name'] ?? 'Produto')) ?></span>
+                            <?php if (!empty($product['image_path'])): ?>
+                                <img src="<?= e(url((string) $product['image_path'])) ?>" alt="<?= e((string) $product['name']) ?>">
+                            <?php else: ?>
+                                <span><?= e((string) ($product['category_name'] ?? 'Produto')) ?></span>
+                            <?php endif; ?>
                         </a>
                         <div class="p-4">
                             <div class="d-flex justify-content-between align-items-start gap-2 mb-2">

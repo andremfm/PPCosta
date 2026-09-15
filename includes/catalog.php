@@ -419,6 +419,80 @@ function catalog_product_by_id(int $id): ?array
     }
 }
 
+function catalog_product_images(int $productId): array
+{
+    if ($productId <= 0) {
+        return [];
+    }
+
+    try {
+        $stmt = db()->prepare(
+            'SELECT id, product_id, path, alt_text, sort_order, is_primary
+             FROM product_images
+             WHERE product_id = :product_id
+             ORDER BY is_primary DESC, sort_order ASC, id ASC'
+        );
+        $stmt->execute(['product_id' => $productId]);
+
+        return $stmt->fetchAll();
+    } catch (Throwable) {
+        return [];
+    }
+}
+
+function catalog_product_variations(int $productId): array
+{
+    if ($productId <= 0) {
+        return [];
+    }
+
+    try {
+        $stmt = db()->prepare(
+            'SELECT pv.*,
+                GROUP_CONCAT(CONCAT(a.name, ": ", av.value) ORDER BY a.id SEPARATOR " · ") AS attributes_label
+             FROM product_variations pv
+             LEFT JOIN variation_attribute_values vav ON vav.variation_id = pv.id
+             LEFT JOIN attribute_values av ON av.id = vav.attribute_value_id
+             LEFT JOIN attributes a ON a.id = av.attribute_id
+             WHERE pv.product_id = :product_id AND pv.is_active = 1
+             GROUP BY pv.id
+             ORDER BY pv.id ASC'
+        );
+        $stmt->execute(['product_id' => $productId]);
+
+        return $stmt->fetchAll();
+    } catch (Throwable) {
+        return [];
+    }
+}
+
+function catalog_product_variation(int $productId, int $variationId): ?array
+{
+    if ($productId <= 0 || $variationId <= 0) {
+        return null;
+    }
+
+    try {
+        $stmt = db()->prepare(
+            'SELECT pv.*,
+                GROUP_CONCAT(CONCAT(a.name, ": ", av.value) ORDER BY a.id SEPARATOR " · ") AS attributes_label
+             FROM product_variations pv
+             LEFT JOIN variation_attribute_values vav ON vav.variation_id = pv.id
+             LEFT JOIN attribute_values av ON av.id = vav.attribute_value_id
+             LEFT JOIN attributes a ON a.id = av.attribute_id
+             WHERE pv.product_id = :product_id AND pv.id = :variation_id AND pv.is_active = 1
+             GROUP BY pv.id
+             LIMIT 1'
+        );
+        $stmt->execute(['product_id' => $productId, 'variation_id' => $variationId]);
+        $variation = $stmt->fetch();
+
+        return $variation ?: null;
+    } catch (Throwable) {
+        return null;
+    }
+}
+
 function catalog_filters_from_request(): array
 {
     return [

@@ -27,22 +27,29 @@ function cart_save(array $cart): void
     $_SESSION['cart'] = $cart;
 }
 
-function cart_item_key(int $productId, array $personalization, string $filePath): string
+function cart_item_key(int $productId, array $personalization, string $filePath, int $variationId = 0): string
 {
     ksort($personalization);
 
     return hash('sha256', json_encode([
         'product_id' => $productId,
+        'variation_id' => $variationId,
         'personalization' => $personalization,
         'file' => $filePath,
     ]));
 }
 
-function cart_add_item(int $productId, int $quantity, array $personalization = [], string $filePath = ''): bool
+function cart_add_item(int $productId, int $quantity, array $personalization = [], string $filePath = '', int $variationId = 0): bool
 {
     $product = catalog_product_by_id($productId);
 
     if (!$product || $quantity < 1) {
+        return false;
+    }
+
+    $variation = $variationId > 0 ? catalog_product_variation($productId, $variationId) : null;
+
+    if ($variationId > 0 && !$variation) {
         return false;
     }
 
@@ -55,19 +62,22 @@ function cart_add_item(int $productId, int $quantity, array $personalization = [
     }
 
     $personalizationTotal = personalization_calculate_total($rules, $personalization);
-    $key = cart_item_key($productId, $personalization, $filePath);
+    $key = cart_item_key($productId, $personalization, $filePath, $variation ? (int) $variation['id'] : 0);
     $cart = cart();
 
     if (isset($cart['items'][$key])) {
         $cart['items'][$key]['quantity'] += $quantity;
     } else {
+        $variationLabel = trim((string) ($variation['attributes_label'] ?? ''));
         $cart['items'][$key] = [
             'key' => $key,
             'product_id' => $productId,
+            'variation_id' => $variation ? (int) $variation['id'] : null,
+            'variation_label' => $variationLabel,
             'name' => $product['name'],
             'slug' => $product['slug'],
-            'sku' => $product['sku'],
-            'unit_price' => (float) $product['final_price'],
+            'sku' => $variation ? (string) $variation['sku'] : $product['sku'],
+            'unit_price' => (float) $product['final_price'] + ($variation ? (float) $variation['price_delta'] : 0.0),
             'quantity' => $quantity,
             'personalization' => array_filter($personalization, static fn ($value): bool => $value !== '' && $value !== null),
             'personalization_total' => $personalizationTotal,

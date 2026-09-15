@@ -82,7 +82,11 @@ require_once __DIR__ . '/includes/header.php';
                     <div class="col-sm-6 col-xl-3">
                         <article class="product-card h-100 overflow-hidden">
                             <a class="product-media <?= e($product['media_class'] ?? 'product-mug') ?>" href="<?= e(product_url($product['slug'])) ?>">
-                                <span><?= e($product['category_name'] ?? 'Produto') ?></span>
+                                <?php if (!empty($product['image_path'])): ?>
+                                    <img src="<?= e(url((string) $product['image_path'])) ?>" alt="<?= e((string) $product['name']) ?>">
+                                <?php else: ?>
+                                    <span><?= e($product['category_name'] ?? 'Produto') ?></span>
+                                <?php endif; ?>
                             </a>
                             <div class="p-3">
                                 <div class="d-flex flex-wrap gap-2 mb-2">

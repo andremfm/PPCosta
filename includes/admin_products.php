@@ -551,6 +551,199 @@ function admin_product_delete(int $id): void
     admin_save_session_products($products);
 }
 
+function admin_product_images(int $productId): array
+{
+    if ($productId <= 0) {
+        return [];
+    }
+
+    try {
+        $stmt = db()->prepare('SELECT * FROM product_images WHERE product_id = :product_id ORDER BY is_primary DESC, sort_order ASC, id ASC');
+        $stmt->execute(['product_id' => $productId]);
+        return $stmt->fetchAll();
+    } catch (Throwable) {
+        return [];
+    }
+}
+
+function admin_product_save_image(int $productId, array $file, string $altText, int $sortOrder, bool $isPrimary): bool
+{
+    if ($productId <= 0 || empty($file['tmp_name']) || !is_uploaded_file($file['tmp_name'])) {
+        return false;
+    }
+
+    $mime = mime_content_type($file['tmp_name']) ?: '';
+    $allowed = ['image/png' => 'png', 'image/jpeg' => 'jpg', 'image/webp' => 'webp', 'image/gif' => 'gif'];
+
+    if (!isset($allowed[$mime]) || (int) ($file['size'] ?? 0) > MAX_UPLOAD_BYTES) {
+        return false;
+    }
+
+    $dir = UPLOAD_DIR . '/products';
+    if (!is_dir($dir)) {
+        mkdir($dir, 0755, true);
+    }
+
+    $filename = 'product_' . $productId . '_' . bin2hex(random_bytes(8)) . '.' . $allowed[$mime];
+    $target = $dir . '/' . $filename;
+
+    if (!move_uploaded_file($file['tmp_name'], $target)) {
+        return false;
+    }
+
+    $path = 'uploads/products/' . $filename;
+
+    if ($isPrimary) {
+        db()->prepare('UPDATE product_images SET is_primary = 0 WHERE product_id = :product_id')->execute(['product_id' => $productId]);
+    }
+
+    $stmt = db()->prepare(
+        'INSERT INTO product_images (product_id, path, alt_text, sort_order, is_primary)
+         VALUES (:product_id, :path, :alt_text, :sort_order, :is_primary)'
+    );
+    $stmt->execute([
+        'product_id' => $productId,
+        'path' => $path,
+        'alt_text' => trim($altText) !== '' ? trim($altText) : null,
+        'sort_order' => $sortOrder,
+        'is_primary' => $isPrimary ? 1 : 0,
+    ]);
+
+    return true;
+}
+
+function admin_product_set_primary_image(int $productId, int $imageId): void
+{
+    db()->prepare('UPDATE product_images SET is_primary = 0 WHERE product_id = :product_id')->execute(['product_id' => $productId]);
+    db()->prepare('UPDATE product_images SET is_primary = 1 WHERE id = :id AND product_id = :product_id')->execute(['id' => $imageId, 'product_id' => $productId]);
+}
+
+function admin_product_delete_image(int $productId, int $imageId): void
+{
+    $stmt = db()->prepare('SELECT path FROM product_images WHERE id = :id AND product_id = :product_id LIMIT 1');
+    $stmt->execute(['id' => $imageId, 'product_id' => $productId]);
+    $path = (string) ($stmt->fetchColumn() ?: '');
+    db()->prepare('DELETE FROM product_images WHERE id = :id AND product_id = :product_id')->execute(['id' => $imageId, 'product_id' => $productId]);
+
+    $absolute = __DIR__ . '/../' . $path;
+    if ($path !== '' && is_file($absolute)) {
+        unlink($absolute);
+    }
+}
+
+function admin_product_variations(int $productId): array
+{
+    if ($productId <= 0) {
+        return [];
+    }
+
+    try {
+        $stmt = db()->prepare(
+            'SELECT pv.*,
+                GROUP_CONCAT(CONCAT(a.name, ": ", av.value) ORDER BY a.id SEPARATOR " · ") AS attributes_label
+             FROM product_variations pv
+             LEFT JOIN variation_attribute_values vav ON vav.variation_id = pv.id
+             LEFT JOIN attribute_values av ON av.id = vav.attribute_value_id
+             LEFT JOIN attributes a ON a.id = av.attribute_id
+             WHERE pv.product_id = :product_id
+             GROUP BY pv.id
+             ORDER BY pv.id DESC'
+        );
+        $stmt->execute(['product_id' => $productId]);
+        return $stmt->fetchAll();
+    } catch (Throwable) {
+        return [];
+    }
+}
+
+function admin_attribute_id(string $slug, string $name, string $type): int
+{
+    $stmt = db()->prepare('SELECT id FROM attributes WHERE slug = :slug LIMIT 1');
+    $stmt->execute(['slug' => $slug]);
+    $id = (int) $stmt->fetchColumn();
+
+    if ($id > 0) {
+        return $id;
+    }
+
+    $stmt = db()->prepare('INSERT INTO attributes (name, slug, type) VALUES (:name, :slug, :type)');
+    $stmt->execute(['name' => $name, 'slug' => $slug, 'type' => $type]);
+    return (int) db()->lastInsertId();
+}
+
+function admin_attribute_value_id(string $attributeSlug, string $attributeName, string $type, string $value): ?int
+{
+    $value = trim($value);
+    if ($value === '') {
+        return null;
+    }
+
+    $attributeId = admin_attribute_id($attributeSlug, $attributeName, $type);
+    $slug = slugify($value);
+    $stmt = db()->prepare('SELECT id FROM attribute_values WHERE attribute_id = :attribute_id AND slug = :slug LIMIT 1');
+    $stmt->execute(['attribute_id' => $attributeId, 'slug' => $slug]);
+    $id = (int) $stmt->fetchColumn();
+
+    if ($id > 0) {
+        return $id;
+    }
+
+    $stmt = db()->prepare('INSERT INTO attribute_values (attribute_id, value, slug) VALUES (:attribute_id, :value, :slug)');
+    $stmt->execute(['attribute_id' => $attributeId, 'value' => $value, 'slug' => $slug]);
+    return (int) db()->lastInsertId();
+}
+
+function admin_product_save_variation(int $productId, array $data): void
+{
+    if ($productId <= 0 || trim((string) ($data['sku'] ?? '')) === '') {
+        return;
+    }
+
+    $pdo = db();
+    $pdo->beginTransaction();
+
+    try {
+        $stmt = $pdo->prepare(
+            'INSERT INTO product_variations (product_id, sku, ean, price_delta, stock, weight_grams, is_active)
+             VALUES (:product_id, :sku, :ean, :price_delta, :stock, :weight_grams, :is_active)'
+        );
+        $stmt->execute([
+            'product_id' => $productId,
+            'sku' => strtoupper(trim((string) $data['sku'])),
+            'ean' => trim((string) ($data['ean'] ?? '')) ?: null,
+            'price_delta' => (float) ($data['price_delta'] ?? 0),
+            'stock' => max(0, (int) ($data['stock'] ?? 0)),
+            'weight_grams' => trim((string) ($data['weight_grams'] ?? '')) !== '' ? (int) $data['weight_grams'] : null,
+            'is_active' => !empty($data['is_active']) ? 1 : 0,
+        ]);
+        $variationId = (int) $pdo->lastInsertId();
+
+        foreach ([
+            ['size', 'Tamanho', 'size', $data['size'] ?? ''],
+            ['cor', 'Cor', 'color', $data['color'] ?? ''],
+            ['material', 'Material', 'material', $data['material'] ?? ''],
+        ] as [$slug, $name, $type, $value]) {
+            $valueId = admin_attribute_value_id($slug, $name, $type, (string) $value);
+            if ($valueId) {
+                $pdo->prepare('INSERT IGNORE INTO variation_attribute_values (variation_id, attribute_value_id) VALUES (:variation_id, :value_id)')
+                    ->execute(['variation_id' => $variationId, 'value_id' => $valueId]);
+            }
+        }
+
+        $pdo->commit();
+    } catch (Throwable $exception) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $exception;
+    }
+}
+
+function admin_product_delete_variation(int $productId, int $variationId): void
+{
+    db()->prepare('DELETE FROM product_variations WHERE id = :id AND product_id = :product_id')->execute(['id' => $variationId, 'product_id' => $productId]);
+}
+
 function admin_products_export_csv(array $products)
 {
     header('Content-Type: text/csv; charset=utf-8');

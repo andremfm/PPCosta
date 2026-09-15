@@ -48,6 +48,41 @@ if (request_method() === 'POST') {
         flash('success', 'Produto removido ou arquivado.');
         redirect('admin/produtos.php');
     }
+
+    if ($action === 'image_upload') {
+        $productId = (int) ($_POST['product_id'] ?? 0);
+        $ok = admin_product_save_image($productId, $_FILES['image'] ?? [], (string) ($_POST['alt_text'] ?? ''), (int) ($_POST['sort_order'] ?? 0), !empty($_POST['is_primary']));
+        flash($ok ? 'success' : 'danger', $ok ? 'Imagem adicionada.' : 'Nao foi possivel adicionar a imagem.');
+        redirect('admin/produtos.php?edit=' . urlencode((string) $productId));
+    }
+
+    if ($action === 'image_primary') {
+        $productId = (int) ($_POST['product_id'] ?? 0);
+        admin_product_set_primary_image($productId, (int) ($_POST['image_id'] ?? 0));
+        flash('success', 'Imagem principal atualizada.');
+        redirect('admin/produtos.php?edit=' . urlencode((string) $productId));
+    }
+
+    if ($action === 'image_delete') {
+        $productId = (int) ($_POST['product_id'] ?? 0);
+        admin_product_delete_image($productId, (int) ($_POST['image_id'] ?? 0));
+        flash('success', 'Imagem removida.');
+        redirect('admin/produtos.php?edit=' . urlencode((string) $productId));
+    }
+
+    if ($action === 'variation_save') {
+        $productId = (int) ($_POST['product_id'] ?? 0);
+        admin_product_save_variation($productId, $_POST);
+        flash('success', 'Variacao adicionada.');
+        redirect('admin/produtos.php?edit=' . urlencode((string) $productId));
+    }
+
+    if ($action === 'variation_delete') {
+        $productId = (int) ($_POST['product_id'] ?? 0);
+        admin_product_delete_variation($productId, (int) ($_POST['variation_id'] ?? 0));
+        flash('success', 'Variacao removida.');
+        redirect('admin/produtos.php?edit=' . urlencode((string) $productId));
+    }
 }
 
 if (!empty($_GET['edit'])) {
@@ -66,6 +101,8 @@ $techniqueOptions = admin_product_technique_options();
 $selectedTechniques = is_array($formProduct['techniques'] ?? null) && $formProduct['techniques'] !== []
     ? $formProduct['techniques']
     : admin_product_selected_techniques((int) ($formProduct['id'] ?? 0));
+$productImages = $editingProduct ? admin_product_images((int) $formProduct['id']) : [];
+$productVariations = $editingProduct ? admin_product_variations((int) $formProduct['id']) : [];
 
 require_once __DIR__ . '/includes/header.php';
 ?>
@@ -214,6 +251,93 @@ require_once __DIR__ . '/includes/header.php';
         </div>
     </form>
 </section>
+
+<?php if ($editingProduct): ?>
+    <section class="admin-grid-2 mb-4">
+        <div class="admin-panel">
+            <h3 class="h5 fw-bold mb-3">Galeria de imagens</h3>
+            <form class="mb-4" method="post" action="<?= e(url('admin/produtos.php')) ?>" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                <input type="hidden" name="action" value="image_upload">
+                <input type="hidden" name="product_id" value="<?= e((string) $formProduct['id']) ?>">
+                <label class="form-label" for="image">Imagem</label>
+                <input class="form-control mb-2" id="image" name="image" type="file" accept=".jpg,.jpeg,.png,.webp,.gif" required>
+                <div class="row g-2">
+                    <div class="col-md-8"><input class="form-control" name="alt_text" type="text" placeholder="Texto alternativo"></div>
+                    <div class="col-md-4"><input class="form-control" name="sort_order" type="number" value="0" placeholder="Ordem"></div>
+                </div>
+                <label class="form-check mt-2"><input class="form-check-input" name="is_primary" type="checkbox" value="1"><span class="form-check-label">Imagem principal</span></label>
+                <button class="btn btn-dark btn-sm mt-3" type="submit">Adicionar imagem</button>
+            </form>
+            <div class="admin-list">
+                <?php foreach ($productImages as $image): ?>
+                    <article>
+                        <div>
+                            <strong><?= e((string) basename((string) $image['path'])) ?></strong>
+                            <span class="d-block"><?= !empty($image['is_primary']) ? 'Principal' : 'Galeria' ?> · ordem <?= e((string) $image['sort_order']) ?></span>
+                        </div>
+                        <div class="admin-actions">
+                            <form method="post" action="<?= e(url('admin/produtos.php')) ?>">
+                                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                                <input type="hidden" name="action" value="image_primary">
+                                <input type="hidden" name="product_id" value="<?= e((string) $formProduct['id']) ?>">
+                                <input type="hidden" name="image_id" value="<?= e((string) $image['id']) ?>">
+                                <button class="btn btn-sm btn-outline-dark" type="submit">Principal</button>
+                            </form>
+                            <form method="post" action="<?= e(url('admin/produtos.php')) ?>">
+                                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                                <input type="hidden" name="action" value="image_delete">
+                                <input type="hidden" name="product_id" value="<?= e((string) $formProduct['id']) ?>">
+                                <input type="hidden" name="image_id" value="<?= e((string) $image['id']) ?>">
+                                <button class="btn btn-sm btn-outline-danger" type="submit">Remover</button>
+                            </form>
+                        </div>
+                    </article>
+                <?php endforeach; ?>
+                <?php if ($productImages === []): ?><p class="text-secondary mb-0">Sem imagens.</p><?php endif; ?>
+            </div>
+        </div>
+
+        <div class="admin-panel">
+            <h3 class="h5 fw-bold mb-3">Variacoes</h3>
+            <form class="mb-4" method="post" action="<?= e(url('admin/produtos.php')) ?>">
+                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                <input type="hidden" name="action" value="variation_save">
+                <input type="hidden" name="product_id" value="<?= e((string) $formProduct['id']) ?>">
+                <div class="row g-2">
+                    <div class="col-md-6"><input class="form-control" name="sku" type="text" placeholder="SKU" required></div>
+                    <div class="col-md-6"><input class="form-control" name="ean" type="text" placeholder="EAN"></div>
+                    <div class="col-md-4"><input class="form-control" name="size" type="text" placeholder="Tamanho"></div>
+                    <div class="col-md-4"><input class="form-control" name="color" type="text" placeholder="Cor"></div>
+                    <div class="col-md-4"><input class="form-control" name="material" type="text" placeholder="Material"></div>
+                    <div class="col-md-4"><input class="form-control" name="price_delta" type="number" step="0.01" value="0" placeholder="+ preco"></div>
+                    <div class="col-md-4"><input class="form-control" name="stock" type="number" min="0" value="0" placeholder="Stock"></div>
+                    <div class="col-md-4"><input class="form-control" name="weight_grams" type="number" min="0" placeholder="Peso g"></div>
+                </div>
+                <label class="form-check mt-2"><input class="form-check-input" name="is_active" type="checkbox" value="1" checked><span class="form-check-label">Ativa</span></label>
+                <button class="btn btn-dark btn-sm mt-3" type="submit">Adicionar variacao</button>
+            </form>
+            <div class="admin-list">
+                <?php foreach ($productVariations as $variation): ?>
+                    <article>
+                        <div>
+                            <strong><?= e((string) $variation['sku']) ?></strong>
+                            <span class="d-block"><?= e((string) ($variation['attributes_label'] ?? 'Sem atributos')) ?> · <?= e(format_price((float) $variation['price_delta'])) ?> · stock <?= e((string) $variation['stock']) ?></span>
+                        </div>
+                        <form method="post" action="<?= e(url('admin/produtos.php')) ?>">
+                            <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                            <input type="hidden" name="action" value="variation_delete">
+                            <input type="hidden" name="product_id" value="<?= e((string) $formProduct['id']) ?>">
+                            <input type="hidden" name="variation_id" value="<?= e((string) $variation['id']) ?>">
+                            <button class="btn btn-sm btn-outline-danger" type="submit">Remover</button>
+                        </form>
+                    </article>
+                <?php endforeach; ?>
+                <?php if ($productVariations === []): ?><p class="text-secondary mb-0">Sem variacoes.</p><?php endif; ?>
+            </div>
+        </div>
+    </section>
+<?php endif; ?>
 
 <section class="admin-panel">
     <h3 class="h5 fw-bold mb-3">Produtos</h3>

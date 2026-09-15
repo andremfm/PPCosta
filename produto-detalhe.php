@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/includes/personalization.php';
 require_once __DIR__ . '/includes/seo.php';
+require_once __DIR__ . '/includes/reviews.php';
 
 $slug = trim($_GET['slug'] ?? '');
 
@@ -47,6 +48,8 @@ $pageSchema = [
 $personalizationRules = !empty($product['is_personalizable'])
     ? personalization_rules_for_product((int) $product['id'])
     : [];
+$productReviews = reviews_for_product((int) $product['id']);
+$reviewSummary = review_summary_for_product((int) $product['id']);
 require_once __DIR__ . '/includes/header.php';
 ?>
 <section class="product-detail section-pad">
@@ -173,6 +176,51 @@ require_once __DIR__ . '/includes/header.php';
                 </div>
             </div>
         </div>
+    </div>
+</section>
+
+<section class="section-pad surface-section">
+    <div class="container">
+        <div class="d-flex flex-column flex-md-row justify-content-between gap-3 mb-4">
+            <div>
+                <p class="text-uppercase text-secondary fw-semibold small mb-2">Clientes</p>
+                <h2 class="section-title mb-0">Avaliacoes</h2>
+            </div>
+            <div class="review-summary align-self-md-end">
+                <strong><?= e((string) $reviewSummary['average']) ?>/5</strong>
+                <span><?= e((string) $reviewSummary['count']) ?> avaliacao(oes)</span>
+            </div>
+        </div>
+
+        <?php if ($productReviews === []): ?>
+            <div class="empty-state bg-white">
+                <h3 class="h5 fw-bold">Ainda sem avaliacoes aprovadas</h3>
+                <p class="text-secondary mb-0">Depois da compra, os clientes podem deixar a sua opiniao na area cliente.</p>
+            </div>
+        <?php else: ?>
+            <div class="row g-4">
+                <?php foreach ($productReviews as $review): ?>
+                    <div class="col-md-6 col-xl-4">
+                        <article class="review-card h-100">
+                            <div class="d-flex justify-content-between gap-3 mb-2">
+                                <strong><?= e(trim((string) ($review['first_name'] ?? '') . ' ' . (string) ($review['last_name'] ?? '')) ?: 'Cliente') ?></strong>
+                                <span class="review-stars"><?= e(review_rating_label((int) $review['rating'])) ?></span>
+                            </div>
+                            <?php if (!empty($review['title'])): ?>
+                                <h3 class="h6 fw-bold"><?= e((string) $review['title']) ?></h3>
+                            <?php endif; ?>
+                            <p class="text-secondary"><?= nl2br(e((string) ($review['comment'] ?? ''))) ?></p>
+                            <?php if (!empty($review['admin_reply'])): ?>
+                                <div class="review-reply">
+                                    <strong>Resposta PPCosta</strong>
+                                    <span><?= nl2br(e((string) $review['admin_reply'])) ?></span>
+                                </div>
+                            <?php endif; ?>
+                        </article>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
     </div>
 </section>
 <?php require_once __DIR__ . '/includes/footer.php'; ?>

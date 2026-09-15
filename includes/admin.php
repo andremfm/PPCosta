@@ -121,6 +121,7 @@ function admin_nav_items(): array
         ['label' => 'Relatorios', 'href' => 'admin/relatorios.php', 'match' => 'relatorios.php'],
         ['label' => 'Personalizacao', 'href' => 'admin/personalizacao.php', 'match' => 'personalizacao.php'],
         ['label' => 'Mensagens', 'href' => 'admin/mensagens.php', 'match' => 'mensagens.php'],
+        ['label' => 'Avaliacoes', 'href' => 'admin/avaliacoes.php', 'match' => 'avaliacoes.php'],
         ['label' => 'Configuracoes', 'href' => 'admin/configuracoes.php', 'match' => 'configuracoes.php'],
     ];
 }

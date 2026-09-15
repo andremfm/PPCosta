@@ -278,8 +278,8 @@ require_once __DIR__ . '/includes/header.php';
                         <input type="hidden" name="action" value="review">
                         <div class="row g-3">
                             <div class="col-md-5">
-                                <label class="form-label" for="product_name">Produto</label>
-                                <input class="form-control" id="product_name" name="product_name" type="text" required>
+                                <label class="form-label" for="product_name">Produto, SKU ou URL</label>
+                                <input class="form-control" id="product_name" name="product_name" type="text" placeholder="Ex.: Body bebe bordado" required>
                             </div>
                             <div class="col-md-2">
                                 <label class="form-label" for="rating">Nota</label>

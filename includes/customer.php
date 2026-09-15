@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/checkout.php';
+require_once __DIR__ . '/reviews.php';
 
 function customer_update_profile(int $userId, array $data): bool
 {
@@ -190,11 +191,36 @@ function customer_reviews(int $userId): array
 
 function customer_save_review(int $userId, array $data): void
 {
+    $productId = review_find_product_id((string) ($data['product_id'] ?? $data['product_name'] ?? ''));
+    $rating = max(1, min(5, (int) ($data['rating'] ?? 5)));
+    $title = trim((string) ($data['title'] ?? ''));
+    $comment = trim((string) ($data['comment'] ?? ''));
+
+    if ($productId) {
+        try {
+            $stmt = db()->prepare(
+                'INSERT INTO reviews (product_id, user_id, rating, title, comment, status)
+                 VALUES (:product_id, :user_id, :rating, :title, :comment, :status)'
+            );
+            $stmt->execute([
+                'product_id' => $productId,
+                'user_id' => $userId,
+                'rating' => $rating,
+                'title' => $title !== '' ? $title : null,
+                'comment' => $comment,
+                'status' => 'pending',
+            ]);
+
+            return;
+        } catch (Throwable) {
+        }
+    }
+
     $review = [
         'product_name' => trim($data['product_name'] ?? ''),
-        'rating' => max(1, min(5, (int) ($data['rating'] ?? 5))),
-        'title' => trim($data['title'] ?? ''),
-        'comment' => trim($data['comment'] ?? ''),
+        'rating' => $rating,
+        'title' => $title,
+        'comment' => $comment,
         'status' => 'pending',
         'created_at' => date(DATE_ATOM),
     ];

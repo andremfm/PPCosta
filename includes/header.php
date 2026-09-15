@@ -56,7 +56,7 @@ foreach (($_SESSION['cart']['items'] ?? []) as $cartItem) {
 </head>
 <body>
 <script>
-    window.PPCOSTA_BASE_URL = '<?= e(APP_URL) ?>';
+    window.PPCOSTA_BASE_URL = '<?= e(url()) ?>';
 </script>
 <header class="site-header">
     <nav class="navbar navbar-expand-lg bg-white border-bottom fixed-top">

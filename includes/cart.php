@@ -49,6 +49,11 @@ function cart_add_item(int $productId, int $quantity, array $personalization = [
     $rules = !empty($product['is_personalizable'])
         ? personalization_rules_for_product($productId)
         : [];
+
+    if (personalization_validate_values($rules, $personalization) !== []) {
+        return false;
+    }
+
     $personalizationTotal = personalization_calculate_total($rules, $personalization);
     $key = cart_item_key($productId, $personalization, $filePath);
     $cart = cart();

@@ -34,6 +34,7 @@ function admin_product_defaults(): array
         'is_on_sale' => 0,
         'is_best_seller' => 0,
         'is_personalizable' => 1,
+        'techniques' => [],
     ];
 }
 
@@ -55,7 +56,34 @@ function admin_products_all(): array
 {
     try {
         if (db_available()) {
-            return catalog_products(['sort' => 'recent']);
+            $stmt = db()->query(
+                'SELECT
+                    p.id,
+                    p.name,
+                    p.slug,
+                    p.short_description,
+                    p.long_description,
+                    p.sku,
+                    p.price,
+                    p.sale_price,
+                    COALESCE(p.sale_price, p.price) AS final_price,
+                    p.stock,
+                    p.stock_minimum,
+                    p.is_active,
+                    p.is_new,
+                    p.is_featured,
+                    p.is_on_sale,
+                    p.is_best_seller,
+                    p.is_personalizable,
+                    c.slug AS category_slug,
+                    c.name AS category_name
+                 FROM products p
+                 LEFT JOIN product_categories pc ON pc.product_id = p.id AND pc.is_primary = 1
+                 LEFT JOIN categories c ON c.id = pc.category_id
+                 ORDER BY p.created_at DESC, p.id DESC'
+            );
+
+            return array_map('catalog_normalize_product', $stmt->fetchAll());
         }
     } catch (Throwable) {
     }
@@ -67,10 +95,29 @@ function admin_product_find(string|int $id): ?array
 {
     try {
         if (db_available()) {
-            $product = catalog_product_by_id((int) $id);
+            $stmt = db()->prepare(
+                'SELECT
+                    p.*,
+                    COALESCE(p.sale_price, p.price) AS final_price,
+                    c.slug AS category_slug,
+                    c.name AS category_name,
+                    tr.rate AS tax_rate,
+                    b.name AS brand_name,
+                    s.name AS supplier_name
+                 FROM products p
+                 LEFT JOIN product_categories pc ON pc.product_id = p.id AND pc.is_primary = 1
+                 LEFT JOIN categories c ON c.id = pc.category_id
+                 LEFT JOIN tax_rates tr ON tr.id = p.tax_rate_id
+                 LEFT JOIN brands b ON b.id = p.brand_id
+                 LEFT JOIN suppliers s ON s.id = p.supplier_id
+                 WHERE p.id = :id
+                 LIMIT 1'
+            );
+            $stmt->execute(['id' => (int) $id]);
+            $product = $stmt->fetch();
 
             if ($product) {
-                return array_merge(admin_product_defaults(), $product);
+                return array_merge(admin_product_defaults(), catalog_normalize_product($product));
             }
         }
     } catch (Throwable) {
@@ -105,6 +152,10 @@ function admin_product_validate(array $data): array
 
     if ((int) ($data['stock'] ?? 0) < 0) {
         $errors[] = 'O stock nao pode ser negativo.';
+    }
+
+    if (!empty($data['is_personalizable']) && empty($data['techniques'])) {
+        $errors[] = 'Escolhe pelo menos uma tecnica de personalizacao para produtos personalizaveis.';
     }
 
     return $errors;
@@ -150,6 +201,7 @@ function admin_product_payload(array $data): array
         'is_on_sale' => !empty($data['is_on_sale']) ? 1 : 0,
         'is_best_seller' => !empty($data['is_best_seller']) ? 1 : 0,
         'is_personalizable' => !empty($data['is_personalizable']) ? 1 : 0,
+        'techniques' => is_array($data['techniques'] ?? null) ? array_values(array_filter(array_map('strval', $data['techniques']))) : [],
     ]);
 }
 
@@ -224,6 +276,7 @@ function admin_product_save(array $data): bool
         }
 
         admin_product_sync_category($productId, $payload['category_slug']);
+        admin_product_sync_techniques($productId, $payload['techniques'], (int) $payload['is_personalizable'] === 1);
         $pdo->commit();
 
         return true;
@@ -233,6 +286,104 @@ function admin_product_save(array $data): bool
         }
 
         return admin_product_save_session($payload);
+    }
+}
+
+function admin_product_technique_options(): array
+{
+    return personalization_technique_options();
+}
+
+function admin_product_selected_techniques(int $productId): array
+{
+    if ($productId <= 0) {
+        return [];
+    }
+
+    try {
+        $stmt = db()->prepare(
+            'SELECT po.value
+             FROM product_personalizations pp
+             INNER JOIN personalization_types pt ON pt.id = pp.personalization_type_id AND pt.slug = "tecnica"
+             INNER JOIN product_personalization_options ppo ON ppo.product_personalization_id = pp.id
+             INNER JOIN personalization_options po ON po.id = ppo.personalization_option_id
+             WHERE pp.product_id = :product_id
+             ORDER BY po.sort_order ASC, po.id ASC'
+        );
+        $stmt->execute(['product_id' => $productId]);
+        $values = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+        if ($values !== []) {
+            return array_map('strval', $values);
+        }
+    } catch (Throwable) {
+    }
+
+    return array_map(static fn (array $option): string => (string) $option['value'], admin_product_technique_options());
+}
+
+function admin_product_sync_techniques(int $productId, array $techniques, bool $isPersonalizable): void
+{
+    if ($productId <= 0) {
+        return;
+    }
+
+    $pdo = db();
+    $typeId = (int) $pdo->query('SELECT id FROM personalization_types WHERE slug = "tecnica" LIMIT 1')->fetchColumn();
+
+    if ($typeId <= 0) {
+        return;
+    }
+
+    $ruleStmt = $pdo->prepare('SELECT id FROM product_personalizations WHERE product_id = :product_id AND personalization_type_id = :type_id LIMIT 1');
+    $ruleStmt->execute(['product_id' => $productId, 'type_id' => $typeId]);
+    $ruleId = (int) $ruleStmt->fetchColumn();
+
+    if ($ruleId <= 0) {
+        $insertRule = $pdo->prepare(
+            'INSERT INTO product_personalizations (
+                product_id, personalization_type_id, label, base_extra_price, sort_order, is_required, is_active
+             ) VALUES (
+                :product_id, :type_id, :label, 0.00, 70, 1, :is_active
+             )'
+        );
+        $insertRule->execute([
+            'product_id' => $productId,
+            'type_id' => $typeId,
+            'label' => 'Tecnica',
+            'is_active' => $isPersonalizable ? 1 : 0,
+        ]);
+        $ruleId = (int) $pdo->lastInsertId();
+    } else {
+        $pdo->prepare('UPDATE product_personalizations SET is_required = 1, is_active = :is_active WHERE id = :id')
+            ->execute(['is_active' => $isPersonalizable ? 1 : 0, 'id' => $ruleId]);
+    }
+
+    $pdo->prepare('DELETE FROM product_personalization_options WHERE product_personalization_id = :rule_id')->execute(['rule_id' => $ruleId]);
+
+    if (!$isPersonalizable || $techniques === []) {
+        return;
+    }
+
+    $optionStmt = $pdo->prepare(
+        'SELECT po.id
+         FROM personalization_options po
+         INNER JOIN personalization_types pt ON pt.id = po.personalization_type_id
+         WHERE pt.slug = "tecnica" AND po.value = :value AND po.is_active = 1
+         LIMIT 1'
+    );
+    $insertOption = $pdo->prepare(
+        'INSERT IGNORE INTO product_personalization_options (product_personalization_id, personalization_option_id)
+         VALUES (:rule_id, :option_id)'
+    );
+
+    foreach (array_unique($techniques) as $technique) {
+        $optionStmt->execute(['value' => (string) $technique]);
+        $optionId = (int) $optionStmt->fetchColumn();
+
+        if ($optionId > 0) {
+            $insertOption->execute(['rule_id' => $ruleId, 'option_id' => $optionId]);
+        }
     }
 }
 
@@ -387,15 +538,9 @@ function admin_product_duplicate(int $id): void
 function admin_product_delete(int $id): void
 {
     try {
-        $stmt = db()->prepare('DELETE FROM products WHERE id = :id');
-        $stmt->execute(['id' => $id]);
+        db()->prepare('UPDATE products SET is_active = 0 WHERE id = :id')->execute(['id' => $id]);
         return;
     } catch (Throwable) {
-        try {
-            db()->prepare('UPDATE products SET is_active = 0 WHERE id = :id')->execute(['id' => $id]);
-            return;
-        } catch (Throwable) {
-        }
     }
 
     $products = array_filter(

@@ -105,9 +105,9 @@ try {
             'nome' => 'Mia',
             'texto' => 'Primeiro Natal',
             'fonte' => 'script',
-            'cor' => '#b91c1c',
-            'posicao' => 'frente',
-            'tecnica' => 'bordado',
+            'cor' => 'gold',
+            'posicao' => 'front',
+            'tecnica' => 'embroidery',
         ],
         'uploaded_personalization_file' => '',
     ], $cookieFile);

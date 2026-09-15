@@ -5,7 +5,7 @@ require_once __DIR__ . '/config.php';
 
 function asset(string $path): string
 {
-    return APP_URL . '/assets/' . ltrim($path, '/');
+    return url('assets/' . ltrim($path, '/'));
 }
 
 function versioned_asset(string $path): string
@@ -19,7 +19,19 @@ function versioned_asset(string $path): string
 
 function url(string $path = ''): string
 {
-    return APP_URL . '/' . ltrim($path, '/');
+    return app_base_url() . '/' . ltrim($path, '/');
+}
+
+function app_base_url(): string
+{
+    if (PHP_SAPI !== 'cli' && !empty($_SERVER['HTTP_HOST'])) {
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $basePath = rtrim((string) (parse_url(APP_URL, PHP_URL_PATH) ?: ''), '/');
+
+        return $scheme . '://' . $_SERVER['HTTP_HOST'] . $basePath;
+    }
+
+    return APP_URL;
 }
 
 function product_url(string $slug): string

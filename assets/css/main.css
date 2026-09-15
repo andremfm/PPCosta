@@ -988,6 +988,13 @@ body {
     padding: 22px;
 }
 
+.admin-subpanel {
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-sm);
+    background: #f8fafc;
+    padding: 18px;
+}
+
 .admin-metric {
     padding: 22px;
     min-height: 132px;

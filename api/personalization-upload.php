@@ -5,6 +5,15 @@ require_once __DIR__ . '/../includes/personalization.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
+if (!verify_csrf($_POST['csrf_token'] ?? null)) {
+    http_response_code(419);
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Sessao expirada. Atualiza a pagina e tenta novamente.',
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 if (empty($_FILES['file']) || !is_uploaded_file($_FILES['file']['tmp_name'])) {
     http_response_code(422);
     echo json_encode([

@@ -62,6 +62,10 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
 
 $formProduct = array_merge(admin_product_defaults(), $editingProduct ?? [], $_SESSION['_old'] ?? []);
 $categories = catalog_categories();
+$techniqueOptions = admin_product_technique_options();
+$selectedTechniques = is_array($formProduct['techniques'] ?? null) && $formProduct['techniques'] !== []
+    ? $formProduct['techniques']
+    : admin_product_selected_techniques((int) ($formProduct['id'] ?? 0));
 
 require_once __DIR__ . '/includes/header.php';
 ?>
@@ -175,6 +179,32 @@ require_once __DIR__ . '/includes/header.php';
                     <?php endforeach; ?>
                 </div>
             </div>
+            <div class="col-12">
+                <div class="admin-subpanel">
+                    <div class="d-flex flex-column flex-md-row justify-content-between gap-2 mb-3">
+                        <div>
+                            <h4 class="h6 fw-bold mb-1">Tecnicas disponiveis neste produto</h4>
+                            <p class="text-secondary small mb-0">Define o que o cliente pode escolher na personalizacao. Ex.: canecas apenas Sublimacao.</p>
+                        </div>
+                    </div>
+                    <div class="admin-check-grid">
+                        <?php foreach ($techniqueOptions as $option): ?>
+                            <label class="form-check">
+                                <input class="form-check-input" name="techniques[]" type="checkbox" value="<?= e((string) $option['value']) ?>" <?= in_array((string) $option['value'], $selectedTechniques, true) ? 'checked' : '' ?>>
+                                <span class="form-check-label">
+                                    <?= e((string) $option['label']) ?>
+                                    <?php if ((float) $option['extra_price'] > 0): ?>
+                                        <small class="d-block text-secondary">+<?= e(format_price((float) $option['extra_price'])) ?></small>
+                                    <?php endif; ?>
+                                </span>
+                            </label>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php if ($techniqueOptions === []): ?>
+                        <p class="text-secondary mb-0">Ainda nao existem tecnicas configuradas.</p>
+                    <?php endif; ?>
+                </div>
+            </div>
         </div>
         <div class="d-flex flex-wrap gap-2 mt-4">
             <button class="btn btn-dark" type="submit">Guardar produto</button>
@@ -212,7 +242,7 @@ require_once __DIR__ . '/includes/header.php';
                                 <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
                                 <input type="hidden" name="action" value="toggle">
                                 <input type="hidden" name="id" value="<?= e((string) $product['id']) ?>">
-                                <button class="btn btn-sm btn-outline-danger" type="submit"><?= !empty($product['is_active']) ? 'Inativar' : 'Ativar' ?></button>
+                                <button class="btn btn-sm <?= !empty($product['is_active']) ? 'btn-outline-warning' : 'btn-outline-success' ?>" type="submit"><?= !empty($product['is_active']) ? 'Inativar' : 'Ativar' ?></button>
                             </form>
                             <form method="post" action="<?= e(url('admin/produtos.php')) ?>" onsubmit="return confirm('Remover este produto?');">
                                 <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">

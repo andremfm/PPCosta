@@ -290,6 +290,14 @@ CREATE TABLE product_personalizations (
     CHECK (base_extra_price >= 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE product_personalization_options (
+    product_personalization_id BIGINT UNSIGNED NOT NULL,
+    personalization_option_id BIGINT UNSIGNED NOT NULL,
+    PRIMARY KEY (product_personalization_id, personalization_option_id),
+    CONSTRAINT fk_product_personalization_options_rule FOREIGN KEY (product_personalization_id) REFERENCES product_personalizations(id) ON DELETE CASCADE,
+    CONSTRAINT fk_product_personalization_options_option FOREIGN KEY (personalization_option_id) REFERENCES personalization_options(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE coupons (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     code VARCHAR(80) NOT NULL,

@@ -7,12 +7,12 @@ require_once __DIR__ . '/functions.php';
 function catalog_fallback_categories(): array
 {
     return [
-        ['id' => 1, 'name' => 'Bebe', 'slug' => 'bebe'],
-        ['id' => 2, 'name' => 'Roupa', 'slug' => 'roupa'],
-        ['id' => 3, 'name' => 'Casa', 'slug' => 'casa'],
-        ['id' => 4, 'name' => 'Canecas', 'slug' => 'canecas'],
-        ['id' => 5, 'name' => 'Empresas', 'slug' => 'empresas'],
-        ['id' => 6, 'name' => 'Brindes', 'slug' => 'brindes'],
+        ['id' => 1, 'name' => 'Bebe', 'slug' => 'bebe', 'description' => 'Bodies, babetes, fraldas e mantas'],
+        ['id' => 2, 'name' => 'Roupa', 'slug' => 'roupa', 'description' => 'T-shirts, sweatshirts e hoodies'],
+        ['id' => 3, 'name' => 'Casa', 'slug' => 'casa', 'description' => 'Toalhas, almofadas e mantas'],
+        ['id' => 4, 'name' => 'Canecas', 'slug' => 'canecas', 'description' => 'Fotografia, frase ou logotipo'],
+        ['id' => 5, 'name' => 'Empresas', 'slug' => 'empresas', 'description' => 'Produtos e packs corporativos'],
+        ['id' => 6, 'name' => 'Brindes', 'slug' => 'brindes', 'description' => 'Porta-chaves, sacos e mochilas'],
     ];
 }
 
@@ -146,16 +146,60 @@ function catalog_categories(): array
 {
     try {
         $stmt = db()->query(
-            'SELECT id, name, slug
+            'SELECT id, name, slug, description, image_path
              FROM categories
              WHERE is_active = 1
              ORDER BY sort_order ASC, name ASC'
         );
 
-        return $stmt->fetchAll();
+        return array_map('catalog_normalize_category', $stmt->fetchAll());
     } catch (Throwable) {
-        return catalog_fallback_categories();
+        return array_map('catalog_normalize_category', catalog_fallback_categories());
     }
+}
+
+function catalog_normalize_category(array $category): array
+{
+    $descriptions = [
+        'bebe' => 'Bodies, babetes, fraldas e mantas',
+        'roupa' => 'T-shirts, sweatshirts e hoodies',
+        'casa' => 'Toalhas, almofadas e mantas',
+        'canecas' => 'Fotografia, frase ou logotipo',
+        'empresas' => 'Produtos e packs corporativos',
+        'brindes' => 'Porta-chaves, sacos e mochilas',
+    ];
+
+    $slug = (string) ($category['slug'] ?? '');
+    $category['description'] = trim((string) ($category['description'] ?? '')) !== ''
+        ? (string) $category['description']
+        : ($descriptions[$slug] ?? 'Produtos personalizados');
+    $category['icon_class'] = catalog_category_icon_class($slug);
+
+    return $category;
+}
+
+function catalog_category_icon_class(string $slug): string
+{
+    return [
+        'bebe' => 'body',
+        'roupa' => 'shirt',
+        'casa' => 'home',
+        'canecas' => 'mug',
+        'empresas' => 'business',
+        'brindes' => 'gift',
+    ][$slug] ?? 'gift';
+}
+
+function catalog_product_media_class(?string $categorySlug): string
+{
+    return [
+        'bebe' => 'product-baby',
+        'canecas' => 'product-mug',
+        'roupa' => 'product-hoodie',
+        'empresas' => 'product-bag',
+        'brindes' => 'product-bag',
+        'casa' => 'product-baby',
+    ][$categorySlug ?? ''] ?? 'product-mug';
 }
 
 function catalog_products(array $filters = []): array
@@ -236,10 +280,18 @@ function catalog_products(array $filters = []): array
         $stmt = db()->prepare($sql);
         $stmt->execute($params);
 
-        return $stmt->fetchAll();
+        return array_map('catalog_normalize_product', $stmt->fetchAll());
     } catch (Throwable) {
         return catalog_filter_fallback_products($filters);
     }
+}
+
+function catalog_normalize_product(array $product): array
+{
+    $product['media_class'] = catalog_product_media_class($product['category_slug'] ?? null);
+    $product['final_price'] = $product['final_price'] ?? ($product['sale_price'] ?: $product['price'] ?? 0);
+
+    return $product;
 }
 
 function catalog_filter_fallback_products(array $filters): array
@@ -323,7 +375,7 @@ function catalog_product_by_slug(string $slug): ?array
         $stmt->execute(['slug' => $slug]);
         $product = $stmt->fetch();
 
-        return $product ?: null;
+        return $product ? catalog_normalize_product($product) : null;
     } catch (Throwable) {
         foreach (catalog_fallback_products() as $product) {
             if ($product['slug'] === $slug) {
@@ -355,7 +407,7 @@ function catalog_product_by_id(int $id): ?array
         $stmt->execute(['id' => $id]);
         $product = $stmt->fetch();
 
-        return $product ?: null;
+        return $product ? catalog_normalize_product($product) : null;
     } catch (Throwable) {
         foreach (catalog_fallback_products() as $product) {
             if ((int) $product['id'] === $id) {

@@ -1,8 +1,10 @@
-Options -Indexes
+Options -Indexes -MultiViews
 RewriteEngine On
 
 RewriteRule ^produto/([a-zA-Z0-9-]+)/?$ produto-detalhe.php?slug=$1 [L,QSA]
 RewriteRule ^categoria/([a-zA-Z0-9-]+)/?$ produto.php?categoria=$1 [L,QSA]
+RewriteRule ^(termos|privacidade|devolucoes)/?$ pagina.php?slug=$1 [L,QSA]
+RewriteRule ^contactos/?$ contactos.php [L,QSA]
 RewriteRule ^sitemap\.xml$ sitemap.php [L,QSA]
 
 <IfModule mod_headers.c>

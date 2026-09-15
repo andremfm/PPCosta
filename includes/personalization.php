@@ -134,12 +134,34 @@ function personalization_rules_for_product(int $productId): array
         }
 
         foreach ($rules as &$rule) {
-            $rule['options'] = personalization_options_for_type((string) $rule['slug']);
+            $rule['options'] = personalization_options_for_rule((int) $rule['id'], (string) $rule['slug']);
         }
 
         return $rules;
     } catch (Throwable) {
         return personalization_fallback_rules();
+    }
+}
+
+function personalization_options_for_rule(int $ruleId, string $typeSlug): array
+{
+    try {
+        $stmt = db()->prepare(
+            'SELECT po.label, po.value, po.extra_price, po.color_hex
+             FROM product_personalization_options ppo
+             INNER JOIN personalization_options po ON po.id = ppo.personalization_option_id
+             INNER JOIN personalization_types pt ON pt.id = po.personalization_type_id
+             WHERE ppo.product_personalization_id = :rule_id
+               AND pt.slug = :slug
+               AND po.is_active = 1
+             ORDER BY po.sort_order ASC, po.id ASC'
+        );
+        $stmt->execute(['rule_id' => $ruleId, 'slug' => $typeSlug]);
+        $options = $stmt->fetchAll();
+
+        return $options !== [] ? $options : personalization_options_for_type($typeSlug);
+    } catch (Throwable) {
+        return personalization_options_for_type($typeSlug);
     }
 }
 
@@ -168,6 +190,11 @@ function personalization_options_for_type(string $typeSlug): array
     }
 }
 
+function personalization_technique_options(): array
+{
+    return personalization_options_for_type('tecnica');
+}
+
 function personalization_calculate_total(array $rules, array $values): float
 {
     $total = 0.0;
@@ -191,6 +218,37 @@ function personalization_calculate_total(array $rules, array $values): float
     }
 
     return $total;
+}
+
+function personalization_validate_values(array $rules, array $values): array
+{
+    $errors = [];
+
+    foreach ($rules as $rule) {
+        $slug = (string) $rule['slug'];
+        $value = $values[$slug] ?? null;
+
+        if (!empty($rule['is_required']) && ($value === null || $value === '' || $value === [])) {
+            $errors[] = (string) $rule['label'] . ' e obrigatorio.';
+            continue;
+        }
+
+        if ($value === null || $value === '' || $value === []) {
+            continue;
+        }
+
+        $options = $rule['options'] ?? [];
+
+        if ($options !== []) {
+            $allowedValues = array_map(static fn (array $option): string => (string) $option['value'], $options);
+
+            if (!in_array((string) $value, $allowedValues, true)) {
+                $errors[] = (string) $rule['label'] . ' invalido para este produto.';
+            }
+        }
+    }
+
+    return $errors;
 }
 
 function personalization_allowed_mime_types(): array

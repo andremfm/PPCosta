@@ -1,5 +1,14 @@
 <?php
+require_once __DIR__ . '/includes/routing.php';
+
+$currentPath = route_normalize_path((string) (parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/'));
+
+if ($currentPath !== '/' && route_dispatch_pretty_path($currentPath)) {
+    return;
+}
+
 require_once __DIR__ . '/includes/seo.php';
+require_once __DIR__ . '/includes/reviews.php';
 
 $pageTitle = 'PPCosta | Artigos personalizados';
 $pageDescription = 'Loja online de artigos personalizados, bordados, estampagens e brindes empresariais.';
@@ -7,39 +16,23 @@ $pageCanonical = url();
 $pageSchema = seo_organization_schema();
 require_once __DIR__ . '/includes/header.php';
 
-$categories = [
-    ['Bebe', 'Bodies, babetes, fraldas e mantas', 'body'],
-    ['Roupa', 'T-shirts, sweatshirts e hoodies', 'shirt'],
-    ['Casa', 'Toalhas, almofadas e mantas', 'home'],
-    ['Canecas', 'Fotografia, frase ou logotipo', 'mug'],
-    ['Empresas', 'Produtos e packs corporativos', 'business'],
-    ['Brindes', 'Porta-chaves, sacos e mochilas', 'gift'],
-];
+$categories = array_slice(catalog_categories(), 0, 6);
+$homeProducts = catalog_products(['sort' => 'recent']);
+$featuredProducts = home_take_products($homeProducts, static fn (array $product): bool => !empty($product['is_featured']) || !empty($product['is_best_seller']) || !empty($product['is_on_sale']), 4);
+$newProducts = home_take_products($homeProducts, static fn (array $product): bool => !empty($product['is_new']), 3);
+$bestSellers = home_take_products(catalog_products(['sort' => 'best_seller']), static fn (array $product): bool => !empty($product['is_best_seller']), 3);
+$reviews = reviews_recent_approved(3);
 
-$featuredProducts = [
-    ['Body bebe bordado', 'Nome personalizado em algodao macio', '19,90 EUR', '24,90 EUR', 'Bebe', 'Bordado', 'product-baby'],
-    ['Caneca personalizada', 'Fotografia, frase ou logotipo', '12,50 EUR', '', 'Canecas', 'Sublimacao', 'product-mug'],
-    ['Hoodie estampado', 'DTF premium ou vinil textil', '34,90 EUR', '39,90 EUR', 'Roupa', 'DTF', 'product-hoodie'],
-    ['Saco de algodao', 'Ideal para eventos e equipas', '8,90 EUR', '', 'Empresas', 'Vinil', 'product-bag'],
-];
+function home_take_products(array $products, callable $filter, int $limit): array
+{
+    $filtered = array_values(array_filter($products, $filter));
 
-$newProducts = [
-    ['Manta personalizada', 'Bordado lateral com nome', '29,90 EUR'],
-    ['Porta-chaves acrilico', 'Corte e impressao UV', '5,90 EUR'],
-    ['Toalha bordada', 'Monograma ou nome completo', '18,90 EUR'],
-];
+    if ($filtered === []) {
+        $filtered = $products;
+    }
 
-$bestSellers = [
-    ['Bodies personalizados', '1.284 unidades'],
-    ['Canecas com fotografia', '947 unidades'],
-    ['T-shirts para eventos', '612 unidades'],
-];
-
-$reviews = [
-    ['Maria F.', 'O body bordado ficou delicado e chegou muito bem embalado.', '5.0'],
-    ['Rui P.', 'As t-shirts da equipa ficaram com excelente qualidade de impressao.', '4.9'],
-    ['Sofia M.', 'Processo simples, preview claro e acabamento muito profissional.', '5.0'],
-];
+    return array_slice($filtered, 0, $limit);
+}
 ?>
 <section class="hero hero-home">
     <div class="container">
@@ -99,10 +92,10 @@ $reviews = [
         <div class="row g-3">
             <?php foreach ($categories as $category): ?>
                 <div class="col-6 col-lg-2">
-                    <a class="category-tile h-100 p-3 p-md-4 text-decoration-none" href="<?= e(category_url(strtolower($category[0]))) ?>">
-                        <span class="category-icon <?= e($category[2]) ?>"></span>
-                        <h3 class="h6 fw-bold mb-1 text-dark"><?= e($category[0]) ?></h3>
-                        <span class="text-secondary small"><?= e($category[1]) ?></span>
+                    <a class="category-tile h-100 p-3 p-md-4 text-decoration-none" href="<?= e(category_url((string) $category['slug'])) ?>">
+                        <span class="category-icon <?= e((string) $category['icon_class']) ?>"></span>
+                        <h3 class="h6 fw-bold mb-1 text-dark"><?= e((string) $category['name']) ?></h3>
+                        <span class="text-secondary small"><?= e((string) $category['description']) ?></span>
                     </a>
                 </div>
             <?php endforeach; ?>
@@ -123,25 +116,25 @@ $reviews = [
             <?php foreach ($featuredProducts as $product): ?>
                 <div class="col-sm-6 col-xl-3">
                     <article class="product-card h-100 overflow-hidden">
-                        <div class="product-media <?= e($product[6]) ?>">
-                            <span><?= e($product[4]) ?></span>
-                        </div>
+                        <a class="product-media <?= e($product['media_class'] ?? 'product-mug') ?>" href="<?= e(product_url((string) $product['slug'])) ?>">
+                            <span><?= e((string) ($product['category_name'] ?? 'Produto')) ?></span>
+                        </a>
                         <div class="p-4">
                             <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
-                                <span class="badge badge-soft rounded-pill"><?= e($product[5]) ?></span>
-                                <?php if ($product[3] !== ''): ?>
+                                <span class="badge badge-soft rounded-pill"><?= !empty($product['is_personalizable']) ? 'Personalizavel' : 'Produto' ?></span>
+                                <?php if (!empty($product['sale_price'])): ?>
                                     <span class="badge text-bg-dark rounded-pill">Promo</span>
                                 <?php endif; ?>
                             </div>
-                            <h3 class="h5 fw-bold"><?= e($product[0]) ?></h3>
-                            <p class="text-secondary small"><?= e($product[1]) ?></p>
+                            <h3 class="h5 fw-bold"><?= e((string) $product['name']) ?></h3>
+                            <p class="text-secondary small"><?= e((string) $product['short_description']) ?></p>
                             <div class="d-flex align-items-center gap-2 mb-3">
-                                <span class="price"><?= e($product[2]) ?></span>
-                                <?php if ($product[3] !== ''): ?>
-                                    <span class="old-price"><?= e($product[3]) ?></span>
+                                <span class="price"><?= e(format_price((float) $product['final_price'])) ?></span>
+                                <?php if (!empty($product['sale_price'])): ?>
+                                    <span class="old-price"><?= e(format_price((float) $product['price'])) ?></span>
                                 <?php endif; ?>
                             </div>
-                            <a class="btn btn-sm btn-dark w-100" href="<?= e(url('produto.php')) ?>">Personalizar</a>
+                            <a class="btn btn-sm btn-dark w-100" href="<?= e(product_url((string) $product['slug'])) ?>">Personalizar</a>
                         </div>
                     </article>
                 </div>
@@ -197,24 +190,24 @@ $reviews = [
             <div class="col-lg-4">
                 <h2 class="h3 fw-bold mb-4">Novidades</h2>
                 <?php foreach ($newProducts as $product): ?>
-                    <a class="list-card" href="<?= e(url('produto.php')) ?>">
+                    <a class="list-card" href="<?= e(product_url((string) $product['slug'])) ?>">
                         <span>
-                            <strong><?= e($product[0]) ?></strong>
-                            <small><?= e($product[1]) ?></small>
+                            <strong><?= e((string) $product['name']) ?></strong>
+                            <small><?= e((string) $product['short_description']) ?></small>
                         </span>
-                        <b><?= e($product[2]) ?></b>
+                        <b><?= e(format_price((float) $product['final_price'])) ?></b>
                     </a>
                 <?php endforeach; ?>
             </div>
             <div class="col-lg-4">
                 <h2 class="h3 fw-bold mb-4">Mais vendidos</h2>
                 <?php foreach ($bestSellers as $product): ?>
-                    <a class="list-card" href="<?= e(url('produto.php')) ?>">
+                    <a class="list-card" href="<?= e(product_url((string) $product['slug'])) ?>">
                         <span>
-                            <strong><?= e($product[0]) ?></strong>
-                            <small><?= e($product[1]) ?></small>
+                            <strong><?= e((string) $product['name']) ?></strong>
+                            <small><?= e((string) ($product['category_name'] ?? 'Produto')) ?></small>
                         </span>
-                        <b>Top</b>
+                        <b><?= e(format_price((float) $product['final_price'])) ?></b>
                     </a>
                 <?php endforeach; ?>
             </div>
@@ -223,12 +216,19 @@ $reviews = [
                 <?php foreach ($reviews as $review): ?>
                     <article class="review-card">
                         <div class="d-flex justify-content-between gap-3 mb-2">
-                            <strong><?= e($review[0]) ?></strong>
-                            <span><?= e($review[2]) ?></span>
+                            <strong><?= e(trim((string) ($review['first_name'] ?? '') . ' ' . (string) ($review['last_name'] ?? '')) ?: 'Cliente') ?></strong>
+                            <span class="review-stars"><?= e(review_rating_label((int) $review['rating'])) ?></span>
                         </div>
-                        <p class="text-secondary mb-0"><?= e($review[1]) ?></p>
+                        <p class="text-secondary small mb-2"><?= e((string) ($review['product_name'] ?? 'Produto')) ?></p>
+                        <p class="text-secondary mb-0"><?= e((string) ($review['comment'] ?? '')) ?></p>
                     </article>
                 <?php endforeach; ?>
+                <?php if ($reviews === []): ?>
+                    <div class="empty-state bg-white">
+                        <h3 class="h5 fw-bold">Ainda sem avaliacoes aprovadas</h3>
+                        <p class="text-secondary mb-0">As opinioes publicadas aparecem aqui apos moderacao.</p>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>

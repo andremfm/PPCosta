@@ -185,6 +185,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const formData = new FormData();
                 formData.append('file', fileField.files[0]);
 
+                const csrfInput = personalizationForm.querySelector('input[name="csrf_token"]');
+
+                if (csrfInput) {
+                    formData.append('csrf_token', csrfInput.value);
+                }
+
                 if (uploadMessage) {
                     uploadMessage.textContent = 'A carregar ficheiro...';
                     uploadMessage.className = 'form-text text-secondary';

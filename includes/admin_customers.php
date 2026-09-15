@@ -304,14 +304,9 @@ function admin_customer_delete(int $id): void
     }
 
     try {
-        db()->prepare('DELETE FROM users WHERE id = :id')->execute(['id' => $id]);
+        db()->prepare('UPDATE users SET status = "blocked" WHERE id = :id')->execute(['id' => $id]);
         return;
     } catch (Throwable) {
-        try {
-            db()->prepare('UPDATE users SET status = "blocked" WHERE id = :id')->execute(['id' => $id]);
-            return;
-        } catch (Throwable) {
-        }
     }
 
     $customers = array_filter(

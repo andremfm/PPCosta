@@ -38,6 +38,27 @@ function reviews_for_product(int $productId): array
     }
 }
 
+function reviews_recent_approved(int $limit = 3): array
+{
+    try {
+        $stmt = db()->prepare(
+            'SELECT r.*, p.name AS product_name, p.slug AS product_slug, u.first_name, u.last_name
+             FROM reviews r
+             INNER JOIN products p ON p.id = r.product_id
+             LEFT JOIN users u ON u.id = r.user_id
+             WHERE r.status = "approved" AND p.is_active = 1
+             ORDER BY r.created_at DESC
+             LIMIT :limit'
+        );
+        $stmt->bindValue('limit', max(1, $limit), PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchAll();
+    } catch (Throwable) {
+        return [];
+    }
+}
+
 function review_summary_for_product(int $productId): array
 {
     try {

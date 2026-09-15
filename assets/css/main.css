@@ -794,6 +794,39 @@ body {
     color: var(--color-muted);
 }
 
+.account-message-thread {
+    display: grid;
+    gap: 12px;
+}
+
+.account-message-bubble {
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-sm);
+    padding: 16px;
+    background: #f8fafc;
+}
+
+.account-message-bubble.admin {
+    border-color: #bfdbfe;
+    background: #eff6ff;
+}
+
+.account-message-bubble.customer {
+    border-color: #fde68a;
+    background: #fffbeb;
+}
+
+.account-message-bubble span {
+    color: var(--color-muted);
+    font-size: 0.82rem;
+}
+
+.account-message-bubble p {
+    margin: 0;
+    color: #334155;
+    line-height: 1.65;
+}
+
 .footer-link {
     display: block;
     color: var(--color-muted);
@@ -1033,6 +1066,39 @@ body {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
+}
+
+.admin-message-thread {
+    display: grid;
+    gap: 12px;
+}
+
+.admin-message-bubble {
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-sm);
+    padding: 16px;
+    background: #f8fafc;
+}
+
+.admin-message-bubble.admin {
+    border-color: #bfdbfe;
+    background: #eff6ff;
+}
+
+.admin-message-bubble.customer {
+    border-color: #fde68a;
+    background: #fffbeb;
+}
+
+.admin-message-bubble span {
+    color: var(--color-muted);
+    font-size: 0.82rem;
+}
+
+.admin-message-bubble p {
+    margin: 0;
+    color: #334155;
+    line-height: 1.65;
 }
 
 .admin-inline-check {

@@ -43,6 +43,18 @@ if (request_method() === 'POST') {
         redirect('perfil.php#mensagens');
     }
 
+    if ($action === 'message_reply') {
+        $threadId = (int) ($_POST['thread_id'] ?? 0);
+
+        if (customer_reply_message($userId, $threadId, (string) ($_POST['body'] ?? ''))) {
+            flash('success', 'Resposta enviada.');
+        } else {
+            flash('danger', 'Nao foi possivel responder a esta conversa.');
+        }
+
+        redirect('perfil.php?mensagem=' . urlencode((string) $threadId) . '#mensagens');
+    }
+
     if ($action === 'review') {
         customer_save_review($userId, $_POST);
         flash('success', 'Avaliacao recebida e pendente de moderacao.');
@@ -57,6 +69,9 @@ $orders = customer_orders($userId);
 $wishlist = customer_wishlist($userId);
 $reviews = customer_reviews($userId);
 $messages = customer_message_threads($userId);
+$messageStatuses = customer_message_statuses();
+$selectedMessageThread = !empty($_GET['mensagem']) ? customer_message_find($userId, (int) $_GET['mensagem']) : null;
+$selectedMessageEntries = $selectedMessageThread ? customer_message_entries($userId, (int) $selectedMessageThread['id']) : [];
 $notifications = customer_notifications($userId);
 
 require_once __DIR__ . '/includes/header.php';
@@ -285,17 +300,57 @@ require_once __DIR__ . '/includes/header.php';
 
                 <section id="mensagens" class="account-panel">
                     <h2 class="h4 fw-bold mb-3">Mensagens</h2>
-                    <div class="account-list mb-4">
-                        <?php foreach ($messages as $message): ?>
-                            <article>
-                                <strong><?= e($message['subject']) ?></strong>
-                                <span><?= e($message['status']) ?> · <?= e($message['last_message_at'] ?? $message['created_at'] ?? '') ?></span>
-                            </article>
-                        <?php endforeach; ?>
-                        <?php if ($messages === []): ?>
-                            <p class="text-secondary mb-0">Ainda nao existem mensagens.</p>
+                    <?php if ($selectedMessageThread): ?>
+                        <div class="d-flex flex-column flex-md-row justify-content-between gap-2 mb-3">
+                            <div>
+                                <h3 class="h5 fw-bold mb-1"><?= e((string) $selectedMessageThread['subject']) ?></h3>
+                                <p class="text-secondary mb-0"><?= e($messageStatuses[$selectedMessageThread['status']] ?? (string) $selectedMessageThread['status']) ?></p>
+                            </div>
+                            <a class="btn btn-outline-dark btn-sm align-self-md-start" href="<?= e(url('perfil.php#mensagens')) ?>">Voltar as mensagens</a>
+                        </div>
+
+                        <div class="account-message-thread mb-4">
+                            <?php foreach ($selectedMessageEntries as $entry): ?>
+                                <article class="account-message-bubble <?= e((string) $entry['sender_type']) ?>">
+                                    <div class="d-flex justify-content-between gap-3 mb-2">
+                                        <strong><?= e((string) $entry['sender_type'] === 'admin' ? 'Administracao' : 'Tu') ?></strong>
+                                        <span><?= e((string) $entry['created_at']) ?></span>
+                                    </div>
+                                    <p><?= nl2br(e((string) $entry['body'])) ?></p>
+                                </article>
+                            <?php endforeach; ?>
+                        </div>
+
+                        <?php if ((string) $selectedMessageThread['status'] !== 'closed'): ?>
+                            <form method="post" action="<?= e(url('perfil.php')) ?>">
+                                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                                <input type="hidden" name="action" value="message_reply">
+                                <input type="hidden" name="thread_id" value="<?= e((string) $selectedMessageThread['id']) ?>">
+                                <label class="form-label" for="reply_body">Responder</label>
+                                <textarea class="form-control" id="reply_body" name="body" rows="4" required></textarea>
+                                <button class="btn btn-dark mt-3" type="submit">Enviar resposta</button>
+                            </form>
+                        <?php else: ?>
+                            <p class="text-secondary mb-0">Esta conversa esta fechada. Podes criar uma nova mensagem se precisares de ajuda.</p>
                         <?php endif; ?>
-                    </div>
+                    <?php else: ?>
+                        <div class="account-list mb-4">
+                            <?php foreach ($messages as $message): ?>
+                                <article>
+                                    <div>
+                                        <strong><?= e($message['subject']) ?></strong>
+                                        <span class="d-block"><?= e($messageStatuses[$message['status']] ?? (string) $message['status']) ?> · <?= e((string) ($message['last_message_at'] ?? $message['created_at'] ?? '')) ?></span>
+                                    </div>
+                                    <?php if (!empty($message['id'])): ?>
+                                        <a class="btn btn-sm btn-outline-dark" href="<?= e(url('perfil.php?mensagem=' . urlencode((string) $message['id']) . '#mensagens')) ?>">Abrir</a>
+                                    <?php endif; ?>
+                                </article>
+                            <?php endforeach; ?>
+                            <?php if ($messages === []): ?>
+                                <p class="text-secondary mb-0">Ainda nao existem mensagens.</p>
+                            <?php endif; ?>
+                        </div>
+                    <?php endif; ?>
                     <form method="post" action="<?= e(url('perfil.php')) ?>">
                         <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
                         <input type="hidden" name="action" value="message">

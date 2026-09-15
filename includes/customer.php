@@ -206,7 +206,7 @@ function customer_message_threads(int $userId): array
 {
     try {
         $stmt = db()->prepare(
-            'SELECT mt.*, MAX(m.created_at) AS last_message_at
+            'SELECT mt.*, MAX(m.created_at) AS last_message_at, COUNT(m.id) AS messages_count
              FROM message_threads mt
              LEFT JOIN messages m ON m.thread_id = mt.id
              WHERE mt.user_id = :user_id
@@ -218,6 +218,55 @@ function customer_message_threads(int $userId): array
         return $stmt->fetchAll();
     } catch (Throwable) {
         return $_SESSION[customer_session_key('messages')] ?? [];
+    }
+}
+
+function customer_message_statuses(): array
+{
+    return [
+        'open' => 'Aberta',
+        'waiting_admin' => 'A aguardar resposta',
+        'waiting_customer' => 'A aguardar a tua resposta',
+        'closed' => 'Fechada',
+    ];
+}
+
+function customer_message_find(int $userId, int $threadId): ?array
+{
+    try {
+        $stmt = db()->prepare(
+            'SELECT *
+             FROM message_threads
+             WHERE id = :id AND user_id = :user_id
+             LIMIT 1'
+        );
+        $stmt->execute(['id' => $threadId, 'user_id' => $userId]);
+        $thread = $stmt->fetch();
+
+        return $thread ?: null;
+    } catch (Throwable) {
+        return null;
+    }
+}
+
+function customer_message_entries(int $userId, int $threadId): array
+{
+    if (!customer_message_find($userId, $threadId)) {
+        return [];
+    }
+
+    try {
+        $stmt = db()->prepare(
+            'SELECT *
+             FROM messages
+             WHERE thread_id = :thread_id
+             ORDER BY created_at ASC, id ASC'
+        );
+        $stmt->execute(['thread_id' => $threadId]);
+
+        return $stmt->fetchAll();
+    } catch (Throwable) {
+        return [];
     }
 }
 
@@ -246,6 +295,42 @@ function customer_send_message(int $userId, array $data): void
             'created_at' => date(DATE_ATOM),
             'last_message_at' => date(DATE_ATOM),
         ];
+    }
+}
+
+function customer_reply_message(int $userId, int $threadId, string $body): bool
+{
+    $body = trim($body);
+    $thread = customer_message_find($userId, $threadId);
+
+    if (!$thread || $body === '' || (string) $thread['status'] === 'closed') {
+        return false;
+    }
+
+    try {
+        $pdo = db();
+        $pdo->beginTransaction();
+
+        $messageStmt = $pdo->prepare('INSERT INTO messages (thread_id, sender_user_id, sender_type, body) VALUES (:thread_id, :sender_user_id, :sender_type, :body)');
+        $messageStmt->execute([
+            'thread_id' => $threadId,
+            'sender_user_id' => $userId,
+            'sender_type' => 'customer',
+            'body' => $body,
+        ]);
+
+        $threadStmt = $pdo->prepare('UPDATE message_threads SET status = :status WHERE id = :id AND user_id = :user_id');
+        $threadStmt->execute(['status' => 'waiting_admin', 'id' => $threadId, 'user_id' => $userId]);
+
+        $pdo->commit();
+
+        return true;
+    } catch (Throwable) {
+        if (isset($pdo) && $pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+
+        return false;
     }
 }
 

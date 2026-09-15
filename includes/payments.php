@@ -24,6 +24,8 @@ function payment_active_methods(): array
         static fn (string $label): array => ['name' => $label, 'price' => 0],
         payment_method_labels()
     ));
+    // These methods have no live provider adapter yet.
+    foreach (['paypal', 'stripe', 'card', 'multibanco'] as $code) unset($methods[$code]);
 
     return array_map(static fn (array $method): string => (string) $method['name'], $methods);
 }
@@ -57,8 +59,8 @@ function payment_create_for_order(int $orderId, array $order): array
         ]);
 
         $payment['id'] = (int) db()->lastInsertId();
-    } catch (Throwable) {
-        $payment['id'] = null;
+    } catch (Throwable $exception) {
+        throw $exception;
     }
 
     return $payment;
@@ -79,9 +81,9 @@ function payment_prepare_payload(string $method, float $amount, string $orderNum
         'multibanco' => [
             'provider' => 'manual',
             'status' => 'pending',
-            'reference' => 'Entidade 12345 / Ref. ' . substr($referenceSeed, 0, 3) . ' ' . substr($referenceSeed, 3, 3) . ' ' . substr($referenceSeed, 6, 3),
-            'instructions' => 'Usa a entidade, referencia e valor indicado para pagar por Multibanco.',
-            'payload' => ['entity' => '12345', 'amount' => $amount],
+            'reference' => $orderNumber,
+            'instructions' => 'Aguarda o envio de uma referencia de pagamento valida pela loja.',
+            'payload' => ['amount' => $amount],
         ],
         'bank_transfer' => [
             'provider' => 'manual',

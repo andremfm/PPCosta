@@ -1,11 +1,14 @@
 <?php
 declare(strict_types=1);
 
+$localConfig = is_file(__DIR__ . '/config.local.php') ? require __DIR__ . '/config.local.php' : [];
+
 function env_value(string $key, string $default = ''): string
 {
     $value = getenv($key);
 
-    return $value === false ? $default : $value;
+    global $localConfig;
+    return $value === false ? (string) ($localConfig[$key] ?? $default) : $value;
 }
 
 define('APP_NAME', env_value('APP_NAME', 'PPCosta'));
@@ -17,7 +20,7 @@ define('DB_HOST', env_value('DB_HOST', '127.0.0.1'));
 define('DB_PORT', (int) env_value('DB_PORT', '3306'));
 define('DB_NAME', env_value('DB_NAME', 'ppcosta_store'));
 define('DB_USER', env_value('DB_USER', 'root'));
-define('DB_PASS', env_value('DB_PASS', 'Andre-slb317'));
+define('DB_PASS', env_value('DB_PASS'));
 define('DB_CHARSET', env_value('DB_CHARSET', 'utf8mb4'));
 
 define('UPLOAD_DIR', env_value('UPLOAD_DIR', __DIR__ . '/../uploads'));

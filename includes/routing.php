@@ -23,6 +23,10 @@ function route_normalize_path(string $path): string
 
 function route_dispatch_pretty_path(string $path): bool
 {
+    if ($path === '/admin') {
+        require dirname(__DIR__) . '/admin/index.php';
+        return true;
+    }
     if (preg_match('#^/produto/([a-zA-Z0-9-]+)/?$#', $path, $matches)) {
         $_GET['slug'] = $matches[1];
         require dirname(__DIR__) . '/produto-detalhe.php';
@@ -52,4 +56,9 @@ function route_dispatch_pretty_path(string $path): bool
     }
 
     return false;
+}
+
+function route_is_private(string $path): bool
+{
+    return (bool) preg_match('#(?:^|/)\.|^/(?:includes|database|tests|docs)(?:/|$)|^/admin/includes(?:/|$)|^/uploads/(?:mail|personalizations)(?:/|$)|\.(?:sql|eml|md|log|toml|ini)$#i', $path);
 }

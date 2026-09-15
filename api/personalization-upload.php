@@ -35,7 +35,7 @@ if ($file['size'] > MAX_UPLOAD_BYTES || !in_array($mime, personalization_allowed
     exit;
 }
 
-$extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+$extension = ['image/png' => 'png', 'image/jpeg' => 'jpg', 'image/svg+xml' => 'svg', 'application/pdf' => 'pdf'][$mime];
 $targetDir = UPLOAD_DIR . '/personalizations';
 
 if (!is_dir($targetDir)) {
@@ -54,8 +54,11 @@ if (!move_uploaded_file($file['tmp_name'], $targetPath)) {
     exit;
 }
 
+$relativePath = 'uploads/personalizations/' . $filename;
+$_SESSION['personalization_uploads'][$relativePath] = ['mime' => $mime, 'size' => (int) $file['size']];
+
 echo json_encode([
     'status' => 'ok',
-    'path' => 'uploads/personalizations/' . $filename,
+    'path' => $relativePath,
     'message' => 'Ficheiro carregado com sucesso.',
 ], JSON_UNESCAPED_UNICODE);

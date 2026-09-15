@@ -3,7 +3,7 @@ PPCosta WebStore
 
 ## Estado atual
 
-Fase 19 concluida: estrutura de pastas, base de dados SQL, autenticacao, FrontOffice, catalogo, produtos, personalizacao, carrinho, checkout, area cliente, administracao, gestao de produtos, gestao de clientes, gestao de encomendas, relatorios, SEO, testes, otimizacoes, seguranca e preparacao para producao.
+Base funcional em desenvolvimento: loja, autenticacao, personalizacao, carrinho, checkout, area cliente e administracao. A revisao de 15/09/2026 corrigiu falhas funcionais, seguranca e adaptacao a dispositivos moveis. Ver `docs/REVIEW-2026-09-15.md` para cobertura e limitacoes.
 
 ## BackOffice
 
@@ -23,4 +23,19 @@ Fase 19 concluida: estrutura de pastas, base de dados SQL, autenticacao, FrontOf
 
 ## Proximas fases
 
-Projeto pronto para validacao final em ambiente real.
+Concluir e testar as integracoes reais de pagamento, envio e faturacao antes de aceitar compras em producao.
+
+## Personalizacao por produto
+
+Em Produtos > Editar > Configurar personalizacoes, gerir campos ativos/obrigatorios,
+limites de texto, ordem, acrescimos base, opcoes permitidas e precos especificos.
+Preco de opcao em branco utiliza o preco global; zero substitui-o por zero.
+O modo global acompanha todas as opcoes ativas, incluindo futuras adicoes.
+O modo selecionado nunca acrescenta opcoes automaticamente. Uma selecao vazia
+num campo obrigatorio impede a compra ate a configuracao ficar completa.
+Fontes e posicoes devem ser previamente criadas na gestao global de personalizacao.
+
+Instalacoes existentes: aplicar uma vez `database/008_product_personalization_settings.sql`
+apos 006 e 007, antes de publicar este codigo. Nao reimportar 001 numa base existente.
+Instalacoes novas: 001 ja inclui estas colunas; nao executar 008 novamente.
+Validacao especifica: `php tests/product_personalization.php` (apenas desenvolvimento).

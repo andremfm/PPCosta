@@ -11,6 +11,7 @@ if (request_method() === 'POST') {
     }
 
     $action = $_POST['action'] ?? '';
+    try {
 
     if ($action === 'save_settings') {
         admin_settings_save($_POST);
@@ -21,6 +22,10 @@ if (request_method() === 'POST') {
     if ($action === 'toggle_method') {
         admin_config_toggle_method((string) ($_POST['table'] ?? ''), (int) ($_POST['id'] ?? 0));
         flash('success', 'Metodo atualizado.');
+        redirect('admin/configuracoes.php');
+    }
+    } catch (Throwable $exception) {
+        flash('danger', $exception instanceof DomainException ? $exception->getMessage() : 'Nao foi possivel guardar as configuracoes.');
         redirect('admin/configuracoes.php');
     }
 }

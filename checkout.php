@@ -27,6 +27,11 @@ if (request_method() === 'POST') {
     }
 
     $order = checkout_store_order(checkout_prepare_order($_POST));
+    if (empty($order['persisted'])) {
+        set_old($_POST);
+        flash('danger', $order['error'] ?? 'Nao foi possivel guardar a encomenda. O carrinho foi mantido. Tenta novamente.');
+        redirect('checkout.php');
+    }
     $_SESSION['last_order'] = $order;
     mailer_send_order_confirmation($order);
     if (!empty($_SESSION['user_id'])) {
@@ -122,7 +127,7 @@ require_once __DIR__ . '/includes/header.php';
 
                     <section class="checkout-panel">
                         <div class="form-check mb-3">
-                            <input class="form-check-input" id="same_billing" name="same_billing" type="checkbox" value="1" checked>
+                            <input class="form-check-input" id="same_billing" name="same_billing" type="checkbox" value="1" <?= !isset($_SESSION['_old']) || old('same_billing') === '1' ? 'checked' : '' ?>>
                             <label class="form-check-label fw-semibold" for="same_billing">Morada de entrega igual a faturacao</label>
                         </div>
                         <div class="checkout-delivery-grid">
@@ -154,7 +159,7 @@ require_once __DIR__ . '/includes/header.php';
                         <div class="checkout-options">
                             <?php foreach ($shippingMethods as $code => $method): ?>
                                 <label class="checkout-option">
-                                    <input type="radio" name="shipping_method" value="<?= e($code) ?>" <?= $code === 'ctt' ? 'checked' : '' ?>>
+                                    <input type="radio" name="shipping_method" value="<?= e($code) ?>" data-shipping-price="<?= e((string) $method['price']) ?>" <?= $code === old('shipping_method', (string) array_key_first($shippingMethods)) ? 'checked' : '' ?> required>
                                     <span>
                                         <strong><?= e($method['name']) ?></strong>
                                         <small><?= e($method['price'] > 0 ? format_price($method['price']) : 'Gratis') ?></small>
@@ -169,8 +174,8 @@ require_once __DIR__ . '/includes/header.php';
                         <div class="checkout-options">
                             <?php foreach ($paymentMethods as $code => $name): ?>
                                 <label class="checkout-option">
-                                    <input type="radio" name="payment_method" value="<?= e($code) ?>" <?= $code === 'mbway' ? 'checked' : '' ?>>
-                                    <span><strong><?= e($name) ?></strong><small>Integracao API preparada</small></span>
+                                    <input type="radio" name="payment_method" value="<?= e($code) ?>" <?= $code === old('payment_method', (string) array_key_first($paymentMethods)) ? 'checked' : '' ?> required>
+                                    <span><strong><?= e($name) ?></strong></span>
                                 </label>
                             <?php endforeach; ?>
                         </div>
@@ -188,7 +193,7 @@ require_once __DIR__ . '/includes/header.php';
                 </div>
 
                 <div class="col-lg-4">
-                    <aside class="cart-summary checkout-summary">
+                    <aside class="cart-summary checkout-summary" data-checkout-summary data-subtotal="<?= e((string) $totals['subtotal']) ?>" data-discount="<?= e((string) $totals['discount']) ?>" data-free-shipping="<?= $totals['subtotal'] >= (float) store_setting('free_shipping_threshold', '75') || ($cart['coupon']['type'] ?? '') === 'free_shipping' ? '1' : '0' ?>">
                         <h2 class="h5 fw-bold mb-4">Resumo da encomenda</h2>
                         <?php foreach ($cart['items'] as $item): ?>
                             <div class="checkout-summary-item">
@@ -199,11 +204,14 @@ require_once __DIR__ . '/includes/header.php';
                         <hr>
                         <div class="summary-line"><span>Subtotal</span><strong><?= e(format_price($totals['subtotal'])) ?></strong></div>
                         <div class="summary-line"><span>Desconto</span><strong>-<?= e(format_price($totals['discount'])) ?></strong></div>
-                        <div class="summary-line"><span>Portes estimados</span><strong><?= e($totals['shipping'] > 0 ? format_price($totals['shipping']) : 'Gratis') ?></strong></div>
+                        <div class="summary-line"><span>Portes</span><strong data-checkout-shipping><?= e($totals['shipping'] > 0 ? format_price($totals['shipping']) : 'Gratis') ?></strong></div>
                         <div class="summary-line"><span>IVA incl.</span><strong><?= e(format_price($totals['tax'])) ?></strong></div>
                         <hr>
-                        <div class="summary-total"><span>Total</span><strong><?= e(format_price($totals['total'])) ?></strong></div>
-                        <button class="btn btn-dark w-100 mt-4" type="submit">Concluir compra</button>
+                        <div class="summary-total" aria-live="polite"><span>Total</span><strong data-checkout-total><?= e(format_price($totals['total'])) ?></strong></div>
+                        <?php if ($shippingMethods === [] || $paymentMethods === []): ?>
+                            <p class="text-danger mt-3">O checkout esta temporariamente indisponivel. Contacta a loja.</p>
+                        <?php endif; ?>
+                        <button class="btn btn-dark w-100 mt-4" type="submit" <?= $shippingMethods === [] || $paymentMethods === [] ? 'disabled' : '' ?>>Concluir compra</button>
                     </aside>
                 </div>
             </div>

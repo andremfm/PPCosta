@@ -7,6 +7,7 @@ require_once __DIR__ . '/reviews.php';
 
 function customer_update_profile(int $userId, array $data): bool
 {
+    if (trim((string) ($data['first_name'] ?? '')) === '' || trim((string) ($data['last_name'] ?? '')) === '') return false;
     try {
         $stmt = db()->prepare(
             'UPDATE users
@@ -23,14 +24,7 @@ function customer_update_profile(int $userId, array $data): bool
 
         return true;
     } catch (Throwable) {
-        $_SESSION[customer_session_key('profile')] = [
-            'first_name' => trim($data['first_name']),
-            'last_name' => trim($data['last_name']),
-            'phone' => trim($data['phone']),
-            'newsletter_opt_in' => !empty($data['newsletter_opt_in']) ? 1 : 0,
-        ];
-
-        return true;
+        return false;
     }
 }
 
@@ -74,6 +68,10 @@ function customer_addresses(int $userId): array
 
 function customer_save_address(int $userId, array $data): void
 {
+    foreach (['first_name', 'last_name', 'address_line_1', 'postal_code', 'city'] as $field) {
+        if (trim((string) ($data[$field] ?? '')) === '') throw new DomainException('Preenche os campos obrigatorios da morada.');
+    }
+    if (!in_array($data['type'] ?? '', ['shipping', 'billing'], true)) throw new DomainException('Tipo de morada invalido.');
     $address = [
         'type' => $data['type'] ?? 'shipping',
         'label' => trim($data['label'] ?? ''),
@@ -102,10 +100,8 @@ function customer_save_address(int $userId, array $data): void
              )'
         );
         $stmt->execute(['user_id' => $userId] + $address);
-    } catch (Throwable) {
-        $addresses = $_SESSION[customer_session_key('addresses')] ?? [];
-        $addresses[] = ['id' => count($addresses) + 1, 'created_at' => date(DATE_ATOM)] + $address;
-        $_SESSION[customer_session_key('addresses')] = $addresses;
+    } catch (Throwable $exception) {
+        throw $exception;
     }
 }
 
@@ -122,15 +118,13 @@ function customer_orders(int $userId): array
         $stmt->execute(['user_id' => $userId]);
         $orders = $stmt->fetchAll();
 
-        if ($orders !== []) {
-            return $orders;
-        }
+        return $orders;
     } catch (Throwable) {
     }
 
     $orders = $_SESSION[customer_session_key('orders')] ?? [];
 
-    if (!empty($_SESSION['last_order'])) {
+    if (!empty($_SESSION['last_order']) && (int) ($_SESSION['last_order']['user_id'] ?? 0) === $userId) {
         $lastOrderNumber = $_SESSION['last_order']['order_number'] ?? null;
         $hasLastOrder = false;
 
@@ -153,7 +147,7 @@ function customer_wishlist(int $userId): array
 {
     try {
         $stmt = db()->prepare(
-            'SELECT p.name, p.slug, p.sku, COALESCE(p.sale_price, p.price) AS final_price
+            'SELECT p.id, p.name, p.slug, p.sku, COALESCE(p.sale_price, p.price) AS final_price
              FROM wishlists w
              INNER JOIN products p ON p.id = w.product_id
              WHERE w.user_id = :user_id
@@ -162,13 +156,21 @@ function customer_wishlist(int $userId): array
         $stmt->execute(['user_id' => $userId]);
         $items = $stmt->fetchAll();
 
-        if ($items !== []) {
-            return $items;
-        }
+        return $items;
     } catch (Throwable) {
     }
 
-    return array_slice(catalog_fallback_products(), 0, 3);
+    return [];
+}
+
+function customer_toggle_wishlist(int $userId, int $productId): bool
+{
+    if (!catalog_product_by_id($productId)) throw new DomainException('Produto indisponivel.');
+    $stmt = db()->prepare('DELETE FROM wishlists WHERE user_id = :user AND product_id = :product');
+    $stmt->execute(['user' => $userId, 'product' => $productId]);
+    if ($stmt->rowCount() > 0) return false;
+    db()->prepare('INSERT IGNORE INTO wishlists (user_id, product_id) VALUES (:user, :product)')->execute(['user' => $userId, 'product' => $productId]);
+    return true;
 }
 
 function customer_reviews(int $userId): array
@@ -191,6 +193,7 @@ function customer_reviews(int $userId): array
 
 function customer_save_review(int $userId, array $data): void
 {
+    if (trim((string) ($data['comment'] ?? '')) === '' || (int) ($data['rating'] ?? 0) < 1 || (int) ($data['rating'] ?? 0) > 5) throw new DomainException('Indica uma classificacao de 1 a 5 e escreve um comentario.');
     $productId = review_find_product_id((string) ($data['product_id'] ?? $data['product_name'] ?? ''));
     $rating = max(1, min(5, (int) ($data['rating'] ?? 5)));
     $title = trim((string) ($data['title'] ?? ''));
@@ -212,20 +215,12 @@ function customer_save_review(int $userId, array $data): void
             ]);
 
             return;
-        } catch (Throwable) {
+        } catch (Throwable $exception) {
+            throw $exception;
         }
     }
 
-    $review = [
-        'product_name' => trim($data['product_name'] ?? ''),
-        'rating' => $rating,
-        'title' => $title,
-        'comment' => $comment,
-        'status' => 'pending',
-        'created_at' => date(DATE_ATOM),
-    ];
-
-    $_SESSION[customer_session_key('reviews')][] = $review;
+    throw new DomainException('Produto nao encontrado.');
 }
 
 function customer_message_threads(int $userId): array
@@ -300,6 +295,7 @@ function customer_send_message(int $userId, array $data): void
 {
     $subject = trim($data['subject'] ?? '');
     $body = trim($data['body'] ?? '');
+    if ($subject === '' || $body === '') throw new DomainException('Preenche o assunto e a mensagem.');
 
     try {
         $pdo = db();
@@ -310,17 +306,11 @@ function customer_send_message(int $userId, array $data): void
         $messageStmt = $pdo->prepare('INSERT INTO messages (thread_id, sender_user_id, sender_type, body) VALUES (:thread_id, :sender_user_id, :sender_type, :body)');
         $messageStmt->execute(['thread_id' => $threadId, 'sender_user_id' => $userId, 'sender_type' => 'customer', 'body' => $body]);
         $pdo->commit();
-    } catch (Throwable) {
+    } catch (Throwable $exception) {
         if (isset($pdo) && $pdo->inTransaction()) {
             $pdo->rollBack();
         }
-
-        $_SESSION[customer_session_key('messages')][] = [
-            'subject' => $subject,
-            'status' => 'waiting_admin',
-            'created_at' => date(DATE_ATOM),
-            'last_message_at' => date(DATE_ATOM),
-        ];
+        throw $exception;
     }
 }
 

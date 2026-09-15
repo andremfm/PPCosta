@@ -28,7 +28,14 @@ if (request_method() === 'POST') {
         redirect('contactos');
     }
 
-    contact_store_message($_POST);
+    try {
+        contact_store_message($_POST);
+    } catch (Throwable $exception) {
+        error_log('Contact failed: ' . $exception->getMessage());
+        set_old($_POST);
+        flash('danger', 'Nao foi possivel enviar a mensagem. Tenta novamente.');
+        redirect('contactos');
+    }
     clear_old();
     flash('success', 'Mensagem enviada. Vamos responder assim que possivel.');
     redirect('contactos');

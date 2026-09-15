@@ -154,7 +154,7 @@ function admin_product_validate(array $data): array
         $errors[] = 'O stock nao pode ser negativo.';
     }
 
-    if (!empty($data['is_personalizable']) && empty($data['techniques'])) {
+    if (empty($data['id']) && !empty($data['is_personalizable']) && empty($data['techniques'])) {
         $errors[] = 'Escolhe pelo menos uma tecnica de personalizacao para produtos personalizaveis.';
     }
 
@@ -276,7 +276,12 @@ function admin_product_save(array $data): bool
         }
 
         admin_product_sync_category($productId, $payload['category_slug']);
-        admin_product_sync_techniques($productId, $payload['techniques'], (int) $payload['is_personalizable'] === 1);
+        if (!empty($data['copy_personalization_from']) && $payload['id'] === '') {
+            require_once __DIR__ . '/admin_product_personalization.php';
+            admin_product_personalization_copy((int) $data['copy_personalization_from'], $productId);
+        } elseif ($payload['id'] === '') {
+            admin_product_sync_techniques($productId, $payload['techniques'], (int) $payload['is_personalizable'] === 1);
+        }
         $pdo->commit();
 
         return true;
@@ -285,7 +290,7 @@ function admin_product_save(array $data): bool
             $pdo->rollBack();
         }
 
-        return admin_product_save_session($payload);
+        return false;
     }
 }
 
@@ -313,13 +318,11 @@ function admin_product_selected_techniques(int $productId): array
         $stmt->execute(['product_id' => $productId]);
         $values = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
-        if ($values !== []) {
-            return array_map('strval', $values);
-        }
+        return array_map('strval', $values);
     } catch (Throwable) {
     }
 
-    return array_map(static fn (array $option): string => (string) $option['value'], admin_product_technique_options());
+    return [];
 }
 
 function admin_product_sync_techniques(int $productId, array $techniques, bool $isPersonalizable): void
@@ -502,22 +505,7 @@ function admin_product_save_session(array $payload): bool
 
 function admin_product_toggle(int $id): void
 {
-    try {
-        db()->prepare('UPDATE products SET is_active = IF(is_active = 1, 0, 1) WHERE id = :id')->execute(['id' => $id]);
-        return;
-    } catch (Throwable) {
-    }
-
-    $products = admin_session_products();
-
-    foreach ($products as &$product) {
-        if ((int) $product['id'] === $id) {
-            $product['is_active'] = empty($product['is_active']) ? 1 : 0;
-            break;
-        }
-    }
-
-    admin_save_session_products($products);
+    db()->prepare('UPDATE products SET is_active = IF(is_active = 1, 0, 1) WHERE id = :id')->execute(['id' => $id]);
 }
 
 function admin_product_duplicate(int $id): void
@@ -531,24 +519,15 @@ function admin_product_duplicate(int $id): void
     $product['id'] = '';
     $product['name'] .= ' copia';
     $product['slug'] = slugify($product['name'] . '-' . bin2hex(random_bytes(2)));
-    $product['sku'] .= '-COPY';
-    admin_product_save($product);
+    $product['sku'] .= '-COPY-' . strtoupper(bin2hex(random_bytes(3)));
+    $product['techniques'] = admin_product_selected_techniques($id);
+    $product['copy_personalization_from'] = $id;
+    if (!admin_product_save($product)) throw new RuntimeException('Nao foi possivel duplicar o produto.');
 }
 
 function admin_product_delete(int $id): void
 {
-    try {
-        db()->prepare('UPDATE products SET is_active = 0 WHERE id = :id')->execute(['id' => $id]);
-        return;
-    } catch (Throwable) {
-    }
-
-    $products = array_filter(
-        admin_session_products(),
-        static fn (array $product): bool => (int) $product['id'] !== $id
-    );
-
-    admin_save_session_products($products);
+    db()->prepare('UPDATE products SET is_active = 0 WHERE id = :id')->execute(['id' => $id]);
 }
 
 function admin_product_images(int $productId): array
@@ -593,6 +572,7 @@ function admin_product_save_image(int $productId, array $file, string $altText, 
 
     $path = 'uploads/products/' . $filename;
 
+    $isPrimary = $isPrimary || admin_product_images($productId) === [];
     if ($isPrimary) {
         db()->prepare('UPDATE product_images SET is_primary = 0 WHERE product_id = :product_id')->execute(['product_id' => $productId]);
     }
@@ -614,8 +594,10 @@ function admin_product_save_image(int $productId, array $file, string $altText, 
 
 function admin_product_set_primary_image(int $productId, int $imageId): void
 {
-    db()->prepare('UPDATE product_images SET is_primary = 0 WHERE product_id = :product_id')->execute(['product_id' => $productId]);
-    db()->prepare('UPDATE product_images SET is_primary = 1 WHERE id = :id AND product_id = :product_id')->execute(['id' => $imageId, 'product_id' => $productId]);
+    $stmt = db()->prepare('SELECT id FROM product_images WHERE id = :id AND product_id = :product_id');
+    $stmt->execute(['id' => $imageId, 'product_id' => $productId]);
+    if (!$stmt->fetchColumn()) throw new DomainException('Imagem inexistente.');
+    db()->prepare('UPDATE product_images SET is_primary = (id = :id) WHERE product_id = :product_id')->execute(['id' => $imageId, 'product_id' => $productId]);
 }
 
 function admin_product_delete_image(int $productId, int $imageId): void
@@ -624,9 +606,13 @@ function admin_product_delete_image(int $productId, int $imageId): void
     $stmt->execute(['id' => $imageId, 'product_id' => $productId]);
     $path = (string) ($stmt->fetchColumn() ?: '');
     db()->prepare('DELETE FROM product_images WHERE id = :id AND product_id = :product_id')->execute(['id' => $imageId, 'product_id' => $productId]);
+    $remaining = admin_product_images($productId);
+    if ($remaining !== [] && empty($remaining[0]['is_primary'])) {
+        admin_product_set_primary_image($productId, (int) $remaining[0]['id']);
+    }
 
     $absolute = __DIR__ . '/../' . $path;
-    if ($path !== '' && is_file($absolute)) {
+    if (preg_match('#^uploads/products/product_[0-9]+_[a-f0-9]+\.(png|jpg|webp|gif)$#', $path) && is_file($absolute)) {
         unlink($absolute);
     }
 }
@@ -696,17 +682,28 @@ function admin_attribute_value_id(string $attributeSlug, string $attributeName, 
 function admin_product_save_variation(int $productId, array $data): void
 {
     if ($productId <= 0 || trim((string) ($data['sku'] ?? '')) === '') {
-        return;
+        throw new DomainException('Indica o SKU da variacao.');
     }
+
+    $product = admin_product_find($productId);
+    if (!$product || (float) ($product['sale_price'] ?? $product['price']) + (float) ($data['price_delta'] ?? 0) < 0 || (int) ($data['stock'] ?? 0) < 0) {
+        throw new DomainException('Preco ou stock da variacao invalido.');
+    }
+    $variationId = (int) ($data['variation_id'] ?? 0);
 
     $pdo = db();
     $pdo->beginTransaction();
 
     try {
-        $stmt = $pdo->prepare(
+        if ($variationId > 0) {
+            if (!admin_product_variation_find($productId, $variationId)) throw new DomainException('Variacao inexistente.');
+            $stmt = $pdo->prepare('UPDATE product_variations SET sku = :sku, ean = :ean, price_delta = :price_delta, stock = :stock, weight_grams = :weight_grams, is_active = :is_active WHERE id = :id AND product_id = :product_id');
+        } else {
+            $stmt = $pdo->prepare(
             'INSERT INTO product_variations (product_id, sku, ean, price_delta, stock, weight_grams, is_active)
              VALUES (:product_id, :sku, :ean, :price_delta, :stock, :weight_grams, :is_active)'
-        );
+            );
+        }
         $stmt->execute([
             'product_id' => $productId,
             'sku' => strtoupper(trim((string) $data['sku'])),
@@ -715,8 +712,9 @@ function admin_product_save_variation(int $productId, array $data): void
             'stock' => max(0, (int) ($data['stock'] ?? 0)),
             'weight_grams' => trim((string) ($data['weight_grams'] ?? '')) !== '' ? (int) $data['weight_grams'] : null,
             'is_active' => !empty($data['is_active']) ? 1 : 0,
-        ]);
-        $variationId = (int) $pdo->lastInsertId();
+        ] + ($variationId > 0 ? ['id' => $variationId] : []));
+        $variationId = $variationId ?: (int) $pdo->lastInsertId();
+        $pdo->prepare('DELETE vav FROM variation_attribute_values vav INNER JOIN attribute_values av ON av.id = vav.attribute_value_id INNER JOIN attributes a ON a.id = av.attribute_id WHERE vav.variation_id = :id AND a.slug IN ("size", "cor", "material")')->execute(['id' => $variationId]);
 
         foreach ([
             ['size', 'Tamanho', 'size', $data['size'] ?? ''],
@@ -739,9 +737,24 @@ function admin_product_save_variation(int $productId, array $data): void
     }
 }
 
+function admin_product_variation_find(int $productId, int $variationId): ?array
+{
+    foreach (admin_product_variations($productId) as $variation) {
+        if ((int) $variation['id'] !== $variationId) continue;
+        $stmt = db()->prepare('SELECT a.slug, av.value FROM variation_attribute_values vav INNER JOIN attribute_values av ON av.id = vav.attribute_value_id INNER JOIN attributes a ON a.id = av.attribute_id WHERE vav.variation_id = :id');
+        $stmt->execute(['id' => $variationId]);
+        foreach ($stmt->fetchAll() as $attribute) {
+            $field = ['size' => 'size', 'cor' => 'color', 'material' => 'material'][$attribute['slug']] ?? null;
+            if ($field) $variation[$field] = $attribute['value'];
+        }
+        return $variation;
+    }
+    return null;
+}
+
 function admin_product_delete_variation(int $productId, int $variationId): void
 {
-    db()->prepare('DELETE FROM product_variations WHERE id = :id AND product_id = :product_id')->execute(['id' => $variationId, 'product_id' => $productId]);
+    db()->prepare('UPDATE product_variations SET is_active = 0 WHERE id = :id AND product_id = :product_id')->execute(['id' => $variationId, 'product_id' => $productId]);
 }
 
 function admin_products_export_csv(array $products)

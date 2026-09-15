@@ -82,10 +82,6 @@ function store_active_methods(string $table, array $fallback): array
         return $fallback;
     }
 
-    if ($rows === []) {
-        return $fallback;
-    }
-
     $methods = [];
 
     foreach ($rows as $row) {

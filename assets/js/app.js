@@ -1,5 +1,39 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const baseUrl = window.PPCOSTA_BASE_URL || '';
+    const baseUrl = (window.PPCOSTA_BASE_URL || '').replace(/\/$/, '');
+    document.querySelectorAll('[data-gallery-thumb]').forEach((button) => {
+        button.addEventListener('click', () => {
+            const main = document.querySelector('[data-gallery-main]');
+            if (!main) return;
+            main.src = button.querySelector('img').src;
+            main.alt = button.getAttribute('aria-label');
+            document.querySelectorAll('[data-gallery-thumb]').forEach((thumb) => thumb.setAttribute('aria-pressed', String(thumb === button)));
+        });
+    });
+    const sameBilling = document.querySelector('#same_billing');
+    if (sameBilling) {
+        const delivery = document.querySelector('.checkout-delivery-grid');
+        const updateDelivery = () => {
+            delivery.hidden = sameBilling.checked;
+            delivery.querySelectorAll('input').forEach((input) => {
+                input.disabled = sameBilling.checked;
+                input.required = !sameBilling.checked;
+            });
+        };
+        sameBilling.addEventListener('change', updateDelivery);
+        updateDelivery();
+    }
+    const checkoutSummary = document.querySelector('[data-checkout-summary]');
+    if (checkoutSummary) {
+        const currency = (value) => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(value);
+        const updateShipping = () => {
+            const selected = document.querySelector('input[name="shipping_method"]:checked');
+            const shipping = checkoutSummary.dataset.freeShipping === '1' ? 0 : Number(selected?.dataset.shippingPrice || 0);
+            checkoutSummary.querySelector('[data-checkout-shipping]').textContent = shipping ? currency(shipping) : 'Gratis';
+            checkoutSummary.querySelector('[data-checkout-total]').textContent = currency(Math.max(0, Number(checkoutSummary.dataset.subtotal) - Number(checkoutSummary.dataset.discount) + shipping));
+        };
+        document.querySelectorAll('input[name="shipping_method"]').forEach((input) => input.addEventListener('change', updateShipping));
+        updateShipping();
+    }
     const newsletterForms = document.querySelectorAll('[data-newsletter-form]');
 
     newsletterForms.forEach((newsletterForm) => {
@@ -18,7 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         'Content-Type': 'application/json',
                         'Accept': 'application/json',
                     },
-                    body: JSON.stringify({ email: input.value.trim() }),
+                    body: JSON.stringify({ email: input.value.trim(), csrf_token: window.PPCOSTA_CSRF_TOKEN }),
                 })
                     .then((response) => response.json())
                     .then((data) => {
@@ -79,7 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const fileField = personalizationForm.querySelector('[data-personalization-file]');
 
             if (fileField && fileField.files.length > 0) {
-                values.ficheiro = fileField.files[0].name;
+                values[fileField.dataset.previewField || 'ficheiro'] = fileField.files[0].name;
             }
 
             return values;
@@ -104,7 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (previewText) {
                 previewText.textContent = text;
-                previewText.style.color = values.cor || '';
+                previewText.style.color = personalizationForm.querySelector('[data-preview-field="cor"]:checked')?.dataset.color || values.cor || '';
                 previewText.dataset.font = values.fonte || '';
             }
 
@@ -113,7 +147,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
+        let priceRequest = 0;
         const updatePrice = () => {
+            const requestId = ++priceRequest;
             fetch(`${baseUrl}/api/personalization-price.php`, {
                 method: 'POST',
                 headers: {
@@ -122,12 +158,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 body: JSON.stringify({
                     product_id: productId,
-                    base_price: currentBasePrice(),
+                    variation_id: Number(variationSelect?.value || 0),
                     values: collectValues(),
                 }),
             })
                 .then((response) => response.json())
                 .then((data) => {
+                    if (requestId !== priceRequest) return;
                     if (data.status === 'ok') {
                         if (extraOutput) {
                             extraOutput.textContent = data.extra_formatted;
@@ -139,6 +176,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 })
                 .catch(() => {
+                    if (requestId !== priceRequest) return;
                     const localExtra = Array.from(personalizationForm.querySelectorAll('[data-personalization-field], [data-personalization-file]')).reduce((sum, field) => {
                         if ((field.type === 'radio' || field.type === 'checkbox') && !field.checked) {
                             return sum;
@@ -152,7 +190,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             return sum;
                         }
 
-                        return sum + Number.parseFloat(field.dataset.baseExtraPrice || field.selectedOptions?.[0]?.dataset.extraPrice || field.dataset.extraPrice || '0');
+                        return sum + Number.parseFloat(field.dataset.baseExtraPrice || '0')
+                            + Number.parseFloat(field.selectedOptions?.[0]?.dataset.extraPrice || field.dataset.extraPrice || '0');
                     }, 0);
 
                     if (extraOutput) {
@@ -165,21 +204,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
         };
 
+        let priceTimer;
         personalizationForm.querySelectorAll('[data-personalization-field], [data-personalization-file], [data-variation-select]').forEach((field) => {
             field.addEventListener('input', () => {
                 updatePreview();
-                updatePrice();
+                clearTimeout(priceTimer);
+                priceTimer = setTimeout(updatePrice, 180);
             });
             field.addEventListener('change', () => {
                 updatePreview();
-                updatePrice();
+                clearTimeout(priceTimer);
+                priceTimer = setTimeout(updatePrice, 180);
             });
         });
 
         const fileField = personalizationForm.querySelector('[data-personalization-file]');
 
         if (fileField) {
+            let uploadRequest = 0;
+            const submitButton = personalizationForm.querySelector('button[type="submit"]');
+            const initiallyDisabled = submitButton.disabled;
             fileField.addEventListener('change', () => {
+                const requestId = ++uploadRequest;
+                uploadedFileInput.value = '';
+                fileField.setCustomValidity('');
+                submitButton.disabled = initiallyDisabled;
                 if (!fileField.files.length) {
                     if (uploadedFileInput) {
                         uploadedFileInput.value = '';
@@ -188,6 +237,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 const formData = new FormData();
+                submitButton.disabled = true;
+                fileField.setCustomValidity('Aguarda a conclusao do carregamento.');
                 formData.append('file', fileField.files[0]);
 
                 const csrfInput = personalizationForm.querySelector('input[name="csrf_token"]');
@@ -207,7 +258,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 })
                     .then((response) => response.json())
                     .then((data) => {
+                        if (requestId !== uploadRequest) return;
                         if (data.status === 'ok') {
+                            fileField.setCustomValidity('');
                             if (uploadedFileInput) {
                                 uploadedFileInput.value = data.path;
                             }
@@ -217,15 +270,21 @@ document.addEventListener('DOMContentLoaded', () => {
                                 uploadMessage.className = 'form-text text-success';
                             }
                         } else if (uploadMessage) {
+                            fileField.setCustomValidity('O ficheiro nao foi carregado. Escolhe outro ficheiro.');
                             uploadMessage.textContent = data.message || 'Ficheiro invalido.';
                             uploadMessage.className = 'form-text text-danger';
                         }
                     })
                     .catch(() => {
+                        if (requestId !== uploadRequest) return;
+                        fileField.setCustomValidity('Nao foi possivel carregar o ficheiro. Tenta novamente.');
                         if (uploadMessage) {
                             uploadMessage.textContent = 'Nao foi possivel carregar o ficheiro neste momento.';
                             uploadMessage.className = 'form-text text-danger';
                         }
+                    })
+                    .finally(() => {
+                        if (requestId === uploadRequest) submitButton.disabled = initiallyDisabled;
                     });
             });
         }
@@ -237,9 +296,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const adminThemeToggle = document.querySelector('[data-admin-theme-toggle]');
 
     if (adminThemeToggle) {
+        const applyTheme = (dark) => {
+            document.body.classList.toggle('admin-dark', dark);
+            adminThemeToggle.textContent = dark ? 'Modo claro' : 'Modo escuro';
+            adminThemeToggle.setAttribute('aria-pressed', String(dark));
+        };
+        try { applyTheme(localStorage.getItem('ppcosta-theme') === 'dark'); } catch (_) { /* Storage may be unavailable. */ }
         adminThemeToggle.addEventListener('click', () => {
-            document.body.classList.toggle('admin-dark');
-            adminThemeToggle.textContent = document.body.classList.contains('admin-dark') ? 'Modo claro' : 'Modo escuro';
+            applyTheme(!document.body.classList.contains('admin-dark'));
+            try { localStorage.setItem('ppcosta-theme', document.body.classList.contains('admin-dark') ? 'dark' : 'light'); } catch (_) { /* Keep the current theme in memory. */ }
         });
     }
 });

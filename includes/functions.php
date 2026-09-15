@@ -24,6 +24,9 @@ function url(string $path = ''): string
 
 function app_base_url(): string
 {
+    if (APP_ENV === 'production') {
+        return APP_URL;
+    }
     if (PHP_SAPI !== 'cli' && !empty($_SERVER['HTTP_HOST'])) {
         $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
         $basePath = rtrim((string) (parse_url(APP_URL, PHP_URL_PATH) ?: ''), '/');
@@ -99,7 +102,8 @@ function request_method(): string
 
 function old(string $key, string $default = ''): string
 {
-    return $_SESSION['_old'][$key] ?? $default;
+    $value = $_SESSION['_old'][$key] ?? $default;
+    return is_scalar($value) ? (string) $value : $default;
 }
 
 function flash(string $type, string $message): void
@@ -147,20 +151,41 @@ function verify_csrf(?string $token): bool
 function rate_limit_allow(string $key, int $maxAttempts = 8, int $windowSeconds = 900): bool
 {
     $now = time();
-    $bucketKey = 'rate_limit_' . hash('sha256', $key);
-    $bucket = $_SESSION[$bucketKey] ?? ['count' => 0, 'reset_at' => $now + $windowSeconds];
-
-    if (($bucket['reset_at'] ?? 0) <= $now) {
-        $bucket = ['count' => 0, 'reset_at' => $now + $windowSeconds];
+    $file = @fopen(rate_limit_path($key), 'c+');
+    if (!$file || !flock($file, LOCK_EX)) {
+        if ($file) fclose($file);
+        return false;
     }
-
-    $bucket['count']++;
-    $_SESSION[$bucketKey] = $bucket;
-
-    return $bucket['count'] <= $maxAttempts;
+    try {
+        $bucket = json_decode(stream_get_contents($file) ?: '{}', true);
+        if (!is_array($bucket) || ($bucket['reset_at'] ?? 0) <= $now) {
+            $bucket = ['count' => 0, 'reset_at' => $now + $windowSeconds];
+        }
+        $bucket['count'] = (int) ($bucket['count'] ?? 0) + 1;
+        rewind($file);
+        ftruncate($file, 0);
+        fwrite($file, json_encode($bucket));
+        fflush($file);
+        return $bucket['count'] <= $maxAttempts;
+    } finally {
+        flock($file, LOCK_UN);
+        fclose($file);
+    }
 }
 
 function rate_limit_clear(string $key): void
 {
-    unset($_SESSION['rate_limit_' . hash('sha256', $key)]);
+    $file = @fopen(rate_limit_path($key), 'c+');
+    if ($file) {
+        if (flock($file, LOCK_EX)) {
+            ftruncate($file, 0);
+            flock($file, LOCK_UN);
+        }
+        fclose($file);
+    }
+}
+
+function rate_limit_path(string $key): string
+{
+    return sys_get_temp_dir() . '/ppcosta_rate_' . hash('sha256', __DIR__ . '|' . $key) . '.json';
 }

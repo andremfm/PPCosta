@@ -11,6 +11,7 @@ if (request_method() === 'POST') {
     }
 
     $action = $_POST['action'] ?? '';
+    try {
 
     if ($action === 'save_type') {
         admin_personalization_save_type($_POST);
@@ -27,6 +28,11 @@ if (request_method() === 'POST') {
     if ($action === 'toggle') {
         admin_personalization_toggle((string) ($_POST['table'] ?? ''), (int) ($_POST['id'] ?? 0));
         flash('success', 'Estado atualizado.');
+        redirect('admin/personalizacao.php');
+    }
+    } catch (Throwable $exception) {
+        error_log('Personalization save failed: ' . $exception->getMessage());
+        flash('danger', 'Nao foi possivel guardar. Confirma os campos e se a opcao ja existe.');
         redirect('admin/personalizacao.php');
     }
 }

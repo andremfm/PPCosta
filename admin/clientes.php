@@ -30,15 +30,23 @@ if (request_method() === 'POST') {
             redirect('admin/clientes.php' . (!empty($_POST['id']) ? '?edit=' . urlencode((string) $_POST['id']) : ''));
         }
 
-        admin_customer_save($_POST);
+        if (!admin_customer_save($_POST)) {
+            set_old($_POST);
+            flash('danger', 'Nao foi possivel guardar o cliente. Confirma se o email ja existe.');
+            redirect('admin/clientes.php' . (!empty($_POST['id']) ? '?edit=' . (int) $_POST['id'] : ''));
+        }
         clear_old();
         flash('success', 'Cliente guardado.');
         redirect('admin/clientes.php');
     }
 
     if ($action === 'delete') {
-        admin_customer_delete((int) ($_POST['id'] ?? 0));
-        flash('success', 'Cliente removido ou bloqueado.');
+        try {
+            admin_customer_delete((int) ($_POST['id'] ?? 0));
+            flash('success', 'Cliente bloqueado.');
+        } catch (Throwable $exception) {
+            flash('danger', $exception instanceof DomainException ? $exception->getMessage() : 'Nao foi possivel bloquear o cliente.');
+        }
         redirect('admin/clientes.php');
     }
 

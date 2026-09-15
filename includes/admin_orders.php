@@ -76,7 +76,8 @@ function admin_orders_all(array $filters = []): array
             $params = [];
 
             if (!empty($filters['q'])) {
-                $where[] = '(o.order_number LIKE :q OR o.customer_email LIKE :q OR o.customer_phone LIKE :q)';
+                $where[] = '(o.order_number LIKE :q OR o.customer_email LIKE :q_email OR o.customer_phone LIKE :q_phone)';
+                $params['q_email'] = $params['q_phone'] = '%' . trim((string) $filters['q']) . '%';
                 $params['q'] = '%' . trim((string) $filters['q']) . '%';
             }
 
@@ -160,6 +161,13 @@ function admin_order_items(string|int $id): array
     return $order['items'] ?? [];
 }
 
+function admin_order_item_personalizations(int $itemId): array
+{
+    $stmt = db()->prepare('SELECT * FROM order_item_personalizations WHERE order_item_id = :id ORDER BY id');
+    $stmt->execute(['id' => $itemId]);
+    return $stmt->fetchAll();
+}
+
 function admin_order_addresses(string|int $id): array
 {
     try {
@@ -236,6 +244,25 @@ function admin_order_update_status(string|int $id, string $status, string $note 
         $orderId = (int) $id;
         $pdo = db();
         $pdo->beginTransaction();
+        $lock = $pdo->prepare('SELECT status FROM orders WHERE id = :id FOR UPDATE');
+        $lock->execute(['id' => $orderId]);
+        $previousStatus = $lock->fetchColumn();
+        if ($previousStatus === false) {
+            throw new RuntimeException('Encomenda inexistente.');
+        }
+        $terminal = ['cancelled', 'refunded'];
+        if (in_array($previousStatus, $terminal, true) && !in_array($status, $terminal, true)) {
+            throw new DomainException('Uma encomenda cancelada ou reembolsada nao pode ser reaberta.');
+        }
+        if (in_array($status, $terminal, true) && !in_array($previousStatus, $terminal, true)) {
+            $reservations = $pdo->prepare('SELECT product_id, variation_id, -SUM(quantity) AS quantity FROM stock_movements WHERE reference_type = "order" AND reference_id = :id AND type IN ("reservation", "release") GROUP BY product_id, variation_id');
+            $reservations->execute(['id' => $orderId]);
+            foreach ($reservations->fetchAll() as $reservation) {
+                if ((int) $reservation['quantity'] <= 0) continue;
+                $release = $pdo->prepare('INSERT INTO stock_movements (product_id, variation_id, user_id, type, quantity, reason, reference_type, reference_id) VALUES (:product_id, :variation_id, :user_id, "release", :quantity, "Reposicao de encomenda", "order", :order_id)');
+                $release->execute($reservation + ['user_id' => $_SESSION['user_id'] ?? null, 'order_id' => $orderId]);
+            }
+        }
         $pdo->prepare('UPDATE orders SET status = :status WHERE id = :id')->execute(['status' => $status, 'id' => $orderId]);
 
         if (trim($note) !== '') {
@@ -258,37 +285,13 @@ function admin_order_update_status(string|int $id, string $status, string $note 
             mailer_send_order_status_update($order, admin_order_status_label($status), $note);
         }
         return;
-    } catch (Throwable) {
+    } catch (Throwable $exception) {
         if (isset($pdo) && $pdo->inTransaction()) {
             $pdo->rollBack();
         }
+        throw $exception;
     }
 
-    if (!empty($_SESSION['last_order']) && ((string) ($_SESSION['last_order']['id'] ?? '') === (string) $id || (string) ($_SESSION['last_order']['order_number'] ?? '') === (string) $id)) {
-        $_SESSION['last_order']['status'] = $status;
-        $_SESSION['last_order']['timeline'][] = [
-            'status' => $status,
-            'note' => trim($note),
-            'created_at' => date(DATE_ATOM),
-        ];
-    }
-
-    foreach ($_SESSION as $key => $value) {
-        if (!str_starts_with((string) $key, 'customer_') || !str_ends_with((string) $key, '_orders') || !is_array($value)) {
-            continue;
-        }
-
-        foreach ($value as $index => $order) {
-            if ((string) ($order['id'] ?? '') === (string) $id || (string) ($order['order_number'] ?? '') === (string) $id) {
-                $_SESSION[$key][$index]['status'] = $status;
-                $_SESSION[$key][$index]['timeline'][] = [
-                    'status' => $status,
-                    'note' => trim($note),
-                    'created_at' => date(DATE_ATOM),
-                ];
-            }
-        }
-    }
 }
 
 function admin_order_status_label(string $status): string

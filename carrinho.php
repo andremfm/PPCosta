@@ -24,9 +24,9 @@ if (request_method() === 'POST') {
     }
 
     if ($action === 'update') {
-        cart_update_quantities(is_array($_POST['quantities'] ?? null) ? $_POST['quantities'] : []);
+        $updated = cart_update_quantities(is_array($_POST['quantities'] ?? null) ? $_POST['quantities'] : []);
         cart_save_notes($_POST['notes'] ?? '', $_POST['shipping_postal_code'] ?? '');
-        flash('success', 'Carrinho atualizado.');
+        flash($updated ? 'success' : 'danger', $updated ? 'Carrinho atualizado.' : 'Quantidade indisponivel. Confirma o stock e as opcoes dos produtos.');
         redirect('carrinho.php');
     }
 
@@ -37,7 +37,9 @@ if (request_method() === 'POST') {
     }
 
     if ($action === 'coupon') {
-        flash(cart_apply_coupon($_POST['coupon_code'] ?? '') ? 'success' : 'warning', 'Cupao processado.');
+        $code = trim((string) ($_POST['coupon_code'] ?? ''));
+        $applied = cart_apply_coupon($code);
+        flash($applied ? 'success' : 'warning', $applied ? ($code === '' ? 'Cupao removido.' : 'Cupao aplicado.') : 'Cupao invalido, expirado ou nao aplicavel a este carrinho.');
         redirect('carrinho.php');
     }
 
@@ -138,7 +140,7 @@ require_once __DIR__ . '/includes/header.php';
                             <input type="hidden" name="action" value="coupon">
                             <label class="form-label" for="coupon_code">Cupao</label>
                             <div class="input-group">
-                                <input class="form-control" id="coupon_code" name="coupon_code" type="text" value="<?= e($cart['coupon']['code'] ?? '') ?>" placeholder="BEMVINDO10">
+                                <input class="form-control" id="coupon_code" name="coupon_code" type="text" value="<?= e($cart['coupon']['code'] ?? '') ?>" placeholder="Codigo do cupao">
                                 <button class="btn btn-outline-dark" type="submit">Aplicar</button>
                             </div>
                         </form>

@@ -145,8 +145,7 @@ function admin_report_product_margins(): array
                     COALESCE(SUM(oi.line_total), 0) AS revenue,
                     COALESCE(SUM((oi.unit_price - COALESCE(p.cost_price, 0)) * oi.quantity), 0) AS profit
                  FROM products p
-                 LEFT JOIN order_items oi ON oi.product_id = p.id
-                 LEFT JOIN orders o ON o.id = oi.order_id AND o.status NOT IN ("cancelled", "refunded")
+                 LEFT JOIN (order_items oi INNER JOIN orders o ON o.id = oi.order_id AND o.status NOT IN ("cancelled", "refunded")) ON oi.product_id = p.id
                  GROUP BY p.id, p.name, p.sku
                  ORDER BY revenue DESC
                  LIMIT 10'

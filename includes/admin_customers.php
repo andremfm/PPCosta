@@ -51,7 +51,8 @@ function admin_customers_all(array $filters = []): array
             $params = [];
 
             if (!empty($filters['q'])) {
-                $where[] = '(first_name LIKE :q OR last_name LIKE :q OR email LIKE :q OR phone LIKE :q)';
+                $where[] = '(first_name LIKE :q OR last_name LIKE :q_last OR email LIKE :q_email OR phone LIKE :q_phone)';
+                $params['q_last'] = $params['q_email'] = $params['q_phone'] = '%' . trim((string) $filters['q']) . '%';
                 $params['q'] = '%' . trim((string) $filters['q']) . '%';
             }
 
@@ -235,7 +236,7 @@ function admin_customer_save(array $data): bool
             $pdo->rollBack();
         }
 
-        return admin_customer_save_session($payload);
+        return false;
     }
 }
 
@@ -300,7 +301,7 @@ function admin_customer_save_session(array $payload): bool
 function admin_customer_delete(int $id): void
 {
     if ($id === (int) ($_SESSION['user_id'] ?? 0)) {
-        return;
+        throw new DomainException('Nao podes bloquear a tua propria conta.');
     }
 
     try {

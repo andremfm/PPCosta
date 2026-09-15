@@ -1,0 +1,6 @@
+/includes/config.local.php
+/uploads/mail/*
+/uploads/personalizations/*
+/uploads/products/*
+/.env
+/.DS_Store

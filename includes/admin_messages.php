@@ -25,7 +25,8 @@ function admin_messages_all(array $filters = []): array
     }
 
     if (!empty($filters['q'])) {
-        $where[] = '(mt.subject LIKE :q OR u.email LIKE :q OR u.first_name LIKE :q OR u.last_name LIKE :q OR latest.body LIKE :q)';
+        $where[] = '(mt.subject LIKE :q OR u.email LIKE :q_email OR u.first_name LIKE :q_first OR u.last_name LIKE :q_last OR latest.body LIKE :q_body)';
+        $params['q_email'] = $params['q_first'] = $params['q_last'] = $params['q_body'] = '%' . $filters['q'] . '%';
         $params['q'] = '%' . $filters['q'] . '%';
     }
 

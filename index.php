@@ -2,8 +2,17 @@
 require_once __DIR__ . '/includes/routing.php';
 
 $currentPath = route_normalize_path((string) (parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/'));
+if (route_is_private($currentPath)) {
+    http_response_code(404);
+    exit('Pagina nao encontrada.');
+}
 
 if ($currentPath !== '/' && route_dispatch_pretty_path($currentPath)) {
+    return;
+}
+if (!in_array($currentPath, ['/', '/index.php'], true)) {
+    http_response_code(404);
+    require __DIR__ . '/pagina.php';
     return;
 }
 
@@ -87,7 +96,7 @@ function home_take_products(array $products, callable $filter, int $limit): arra
                 <p class="text-uppercase text-secondary fw-semibold small mb-2">Categorias</p>
                 <h2 class="section-title mb-0">Escolhe o ponto de partida</h2>
             </div>
-            <p class="text-secondary mb-0">Cada categoria aceita produtos simples, bordados ou estampados.</p>
+            <p class="text-secondary mb-0">Artigos para oferecer, usar e dar a conhecer a tua marca.</p>
         </div>
         <div class="row g-3">
             <?php foreach ($categories as $category): ?>
@@ -153,7 +162,7 @@ function home_take_products(array $products, callable $filter, int $limit): arra
             <div class="col-lg-5">
                 <p class="text-uppercase text-secondary fw-semibold small mb-2">Personalizacao</p>
                 <h2 class="section-title mb-3">Da ideia ao artigo final em poucos passos</h2>
-                <p class="text-secondary">A experiencia sera ligada ao editor visual na fase de personalizacao. A frente da loja ja prepara as opcoes que o cliente espera encontrar.</p>
+                <p class="text-secondary">Nomes, frases e imagens que tornam cada artigo especial.</p>
             </div>
             <div class="col-lg-7">
                 <div class="process-grid">
@@ -173,14 +182,14 @@ function home_take_products(array $products, callable $filter, int $limit): arra
     <div class="container">
         <div class="row g-4 align-items-center">
             <div class="col-lg-7">
-                <p class="text-uppercase fw-semibold small mb-2">Campanha</p>
-                <h2 class="section-title mb-3">Packs empresariais com desconto por quantidade</h2>
+                <p class="text-uppercase fw-semibold small mb-2">Empresas</p>
+                <h2 class="section-title mb-3">Artigos personalizados para a tua equipa</h2>
                 <p class="mb-0">Ideal para equipas, eventos, brindes de marca, feiras e campanhas sazonais.</p>
             </div>
             <div class="col-lg-5">
                 <div class="promo-panel">
-                    <span>Desde</span>
-                    <strong>25 unidades</strong>
+                    <span>A tua marca</span>
+                    <strong>Em cada detalhe</strong>
                     <a class="btn btn-light w-100 mt-3" href="<?= e(category_url('empresas')) ?>">Ver produtos empresariais</a>
                 </div>
             </div>
@@ -244,7 +253,7 @@ function home_take_products(array $products, callable $filter, int $limit): arra
             <div class="col-lg-6">
                 <p class="text-uppercase text-secondary fw-semibold small mb-2">Newsletter</p>
                 <h2 class="h3 fw-bold mb-2">Recebe novidades, campanhas e ideias de personalizacao</h2>
-                <p class="text-secondary mb-0">Conteudo comercial sem ruido, preparado para exportacao e templates de email.</p>
+                <p class="text-secondary mb-0">Novas colecoes e ideias para os teus proximos presentes.</p>
             </div>
             <div class="col-lg-6">
                 <form class="newsletter-form" data-newsletter-form>

@@ -13,6 +13,7 @@ if (request_method() === 'POST') {
     }
 
     $action = $_POST['action'] ?? '';
+    try {
 
     if ($action === 'save') {
         $errors = admin_product_validate($_POST);
@@ -25,7 +26,11 @@ if (request_method() === 'POST') {
             redirect('admin/produtos.php' . (!empty($_POST['id']) ? '?edit=' . urlencode((string) $_POST['id']) : ''));
         }
 
-        admin_product_save($_POST);
+        if (!admin_product_save($_POST)) {
+            set_old($_POST);
+            flash('danger', 'Nao foi possivel guardar. Confirma se o SKU e o endereco do produto sao unicos.');
+            redirect('admin/produtos.php' . (!empty($_POST['id']) ? '?edit=' . (int) $_POST['id'] : ''));
+        }
         clear_old();
         flash('success', 'Produto guardado.');
         redirect('admin/produtos.php');
@@ -73,15 +78,20 @@ if (request_method() === 'POST') {
     if ($action === 'variation_save') {
         $productId = (int) ($_POST['product_id'] ?? 0);
         admin_product_save_variation($productId, $_POST);
-        flash('success', 'Variacao adicionada.');
+        flash('success', 'Variacao guardada.');
         redirect('admin/produtos.php?edit=' . urlencode((string) $productId));
     }
 
     if ($action === 'variation_delete') {
         $productId = (int) ($_POST['product_id'] ?? 0);
         admin_product_delete_variation($productId, (int) ($_POST['variation_id'] ?? 0));
-        flash('success', 'Variacao removida.');
+        flash('success', 'Variacao arquivada.');
         redirect('admin/produtos.php?edit=' . urlencode((string) $productId));
+    }
+    } catch (Throwable $exception) {
+        error_log('Product media/variation failed: ' . $exception->getMessage());
+        flash('danger', 'Nao foi possivel guardar a alteracao. Confirma os dados e se o SKU ja existe.');
+        redirect('admin/produtos.php?edit=' . (int) ($_POST['product_id'] ?? 0));
     }
 }
 
@@ -103,6 +113,7 @@ $selectedTechniques = is_array($formProduct['techniques'] ?? null) && $formProdu
     : admin_product_selected_techniques((int) ($formProduct['id'] ?? 0));
 $productImages = $editingProduct ? admin_product_images((int) $formProduct['id']) : [];
 $productVariations = $editingProduct ? admin_product_variations((int) $formProduct['id']) : [];
+$editingVariation = $editingProduct && !empty($_GET['variation']) ? admin_product_variation_find((int) $formProduct['id'], (int) $_GET['variation']) : null;
 
 require_once __DIR__ . '/includes/header.php';
 ?>
@@ -224,6 +235,9 @@ require_once __DIR__ . '/includes/header.php';
                             <p class="text-secondary small mb-0">Define o que o cliente pode escolher na personalizacao. Ex.: canecas apenas Sublimacao.</p>
                         </div>
                     </div>
+                    <?php if (!empty($formProduct['id'])): ?>
+                        <a class="btn btn-outline-dark" href="<?= e(url('admin/produto-personalizacao.php?product_id=' . (int) $formProduct['id'])) ?>">Configurar personalizacoes</a>
+                    <?php else: ?>
                     <div class="admin-check-grid">
                         <?php foreach ($techniqueOptions as $option): ?>
                             <label class="form-check">
@@ -239,6 +253,7 @@ require_once __DIR__ . '/includes/header.php';
                     </div>
                     <?php if ($techniqueOptions === []): ?>
                         <p class="text-secondary mb-0">Ainda nao existem tecnicas configuradas.</p>
+                    <?php endif; ?>
                     <?php endif; ?>
                 </div>
             </div>
@@ -298,38 +313,41 @@ require_once __DIR__ . '/includes/header.php';
             </div>
         </div>
 
-        <div class="admin-panel">
-            <h3 class="h5 fw-bold mb-3">Variacoes</h3>
+        <div class="admin-panel" id="variacoes">
+            <h3 class="h5 fw-bold mb-3"><?= $editingVariation ? 'Editar variacao' : 'Variacoes' ?></h3>
             <form class="mb-4" method="post" action="<?= e(url('admin/produtos.php')) ?>">
                 <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
                 <input type="hidden" name="action" value="variation_save">
+                <input type="hidden" name="variation_id" value="<?= (int) ($editingVariation['id'] ?? 0) ?>">
                 <input type="hidden" name="product_id" value="<?= e((string) $formProduct['id']) ?>">
                 <div class="row g-2">
-                    <div class="col-md-6"><input class="form-control" name="sku" type="text" placeholder="SKU" required></div>
-                    <div class="col-md-6"><input class="form-control" name="ean" type="text" placeholder="EAN"></div>
-                    <div class="col-md-4"><input class="form-control" name="size" type="text" placeholder="Tamanho"></div>
-                    <div class="col-md-4"><input class="form-control" name="color" type="text" placeholder="Cor"></div>
-                    <div class="col-md-4"><input class="form-control" name="material" type="text" placeholder="Material"></div>
-                    <div class="col-md-4"><input class="form-control" name="price_delta" type="number" step="0.01" value="0" placeholder="+ preco"></div>
-                    <div class="col-md-4"><input class="form-control" name="stock" type="number" min="0" value="0" placeholder="Stock"></div>
-                    <div class="col-md-4"><input class="form-control" name="weight_grams" type="number" min="0" placeholder="Peso g"></div>
+                    <?php foreach (['sku' => 'SKU', 'ean' => 'EAN', 'size' => 'Tamanho', 'color' => 'Cor', 'material' => 'Material', 'price_delta' => 'Acrescimo de preco', 'stock' => 'Stock', 'weight_grams' => 'Peso (g)'] as $field => $label): ?>
+                        <?php $numeric = in_array($field, ['price_delta', 'stock', 'weight_grams'], true); ?>
+                        <div class="col-md-6">
+                            <label class="form-label" for="variation-<?= e($field) ?>"><?= e($label) ?></label>
+                            <input class="form-control" id="variation-<?= e($field) ?>" name="<?= e($field) ?>" type="<?= $numeric ? 'number' : 'text' ?>" value="<?= e((string) ($editingVariation[$field] ?? ($numeric ? 0 : ''))) ?>" <?= $field === 'sku' ? 'required' : '' ?> <?= $field === 'price_delta' ? 'step="0.01"' : ($numeric ? 'min="0" step="1"' : '') ?>>
+                        </div>
+                    <?php endforeach; ?>
                 </div>
-                <label class="form-check mt-2"><input class="form-check-input" name="is_active" type="checkbox" value="1" checked><span class="form-check-label">Ativa</span></label>
-                <button class="btn btn-dark btn-sm mt-3" type="submit">Adicionar variacao</button>
+                <label class="form-check mt-2"><input class="form-check-input" name="is_active" type="checkbox" value="1" <?= !$editingVariation || !empty($editingVariation['is_active']) ? 'checked' : '' ?>><span class="form-check-label">Ativa</span></label>
+                <button class="btn btn-dark btn-sm mt-3" type="submit"><?= $editingVariation ? 'Guardar variacao' : 'Adicionar variacao' ?></button>
+                <?php if ($editingVariation): ?><a class="btn btn-outline-dark btn-sm mt-3" href="<?= e(url('admin/produtos.php?edit=' . (int) $formProduct['id'] . '#variacoes')) ?>">Cancelar</a><?php endif; ?>
             </form>
             <div class="admin-list">
                 <?php foreach ($productVariations as $variation): ?>
                     <article>
                         <div>
                             <strong><?= e((string) $variation['sku']) ?></strong>
+                            <small><?= !empty($variation['is_active']) ? 'Ativa' : 'Arquivada' ?></small>
                             <span class="d-block"><?= e((string) ($variation['attributes_label'] ?? 'Sem atributos')) ?> · <?= e(format_price((float) $variation['price_delta'])) ?> · stock <?= e((string) $variation['stock']) ?></span>
                         </div>
+                        <a class="btn btn-sm btn-outline-dark" href="<?= e(url('admin/produtos.php?edit=' . (int) $formProduct['id'] . '&variation=' . (int) $variation['id'] . '#variacoes')) ?>">Editar</a>
                         <form method="post" action="<?= e(url('admin/produtos.php')) ?>">
                             <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
                             <input type="hidden" name="action" value="variation_delete">
                             <input type="hidden" name="product_id" value="<?= e((string) $formProduct['id']) ?>">
                             <input type="hidden" name="variation_id" value="<?= e((string) $variation['id']) ?>">
-                            <button class="btn btn-sm btn-outline-danger" type="submit">Remover</button>
+                            <button class="btn btn-sm btn-outline-danger" type="submit" <?= empty($variation['is_active']) ? 'disabled' : '' ?>>Arquivar</button>
                         </form>
                     </article>
                 <?php endforeach; ?>

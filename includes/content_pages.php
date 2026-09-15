@@ -102,17 +102,11 @@ function contact_store_message(array $data): void
         ]);
 
         $pdo->commit();
-    } catch (Throwable) {
+    } catch (Throwable $exception) {
         if (isset($pdo) && $pdo->inTransaction()) {
             $pdo->rollBack();
         }
 
-        $_SESSION['contact_messages'][] = [
-            'name' => $name,
-            'email' => $email,
-            'subject' => $subject,
-            'body' => $body,
-            'created_at' => date(DATE_ATOM),
-        ];
+        throw $exception;
     }
 }

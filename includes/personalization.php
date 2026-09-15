@@ -129,25 +129,28 @@ function personalization_rules_for_product(int $productId): array
         $stmt->execute(['product_id' => $productId]);
         $rules = $stmt->fetchAll();
 
-        if ($rules === []) {
-            return personalization_fallback_rules();
-        }
-
         foreach ($rules as &$rule) {
             $rule['options'] = personalization_options_for_rule((int) $rule['id'], (string) $rule['slug']);
         }
 
         return $rules;
-    } catch (Throwable) {
-        return personalization_fallback_rules();
+    } catch (Throwable $exception) {
+        error_log('Personalization rules unavailable: ' . $exception->getMessage());
+        return [];
     }
 }
 
 function personalization_options_for_rule(int $ruleId, string $typeSlug): array
 {
     try {
+        $modeStmt = db()->prepare('SELECT options_mode FROM product_personalizations WHERE id = ?');
+        $modeStmt->execute([$ruleId]);
+        $mode = $modeStmt->fetchColumn();
+        if ($mode === 'all') {
+            return personalization_options_for_type($typeSlug);
+        }
         $stmt = db()->prepare(
-            'SELECT po.label, po.value, po.extra_price, po.color_hex
+            'SELECT po.label, po.value, COALESCE(ppo.extra_price, po.extra_price) AS extra_price, po.color_hex
              FROM product_personalization_options ppo
              INNER JOIN personalization_options po ON po.id = ppo.personalization_option_id
              INNER JOIN personalization_types pt ON pt.id = po.personalization_type_id
@@ -159,9 +162,14 @@ function personalization_options_for_rule(int $ruleId, string $typeSlug): array
         $stmt->execute(['rule_id' => $ruleId, 'slug' => $typeSlug]);
         $options = $stmt->fetchAll();
 
-        return $options !== [] ? $options : personalization_options_for_type($typeSlug);
+        if ($mode === 'selected' || $options !== [] || $typeSlug === 'tecnica') {
+            return $options;
+        }
+        $count = db()->prepare('SELECT COUNT(*) FROM product_personalization_options WHERE product_personalization_id = :id');
+        $count->execute(['id' => $ruleId]);
+        return (int) $count->fetchColumn() > 0 ? [] : personalization_options_for_type($typeSlug);
     } catch (Throwable) {
-        return personalization_options_for_type($typeSlug);
+        return [];
     }
 }
 
@@ -223,6 +231,11 @@ function personalization_calculate_total(array $rules, array $values): float
 function personalization_validate_values(array $rules, array $values): array
 {
     $errors = [];
+    foreach ($values as $slug => $value) {
+        if (!in_array($slug, array_column($rules, 'slug'), true) || !is_scalar($value)) {
+            $errors[] = 'Personalizacao invalida para este produto.';
+        }
+    }
 
     foreach ($rules as $rule) {
         $slug = (string) $rule['slug'];
@@ -237,9 +250,18 @@ function personalization_validate_values(array $rules, array $values): array
             continue;
         }
 
+        if (!is_scalar($value)) {
+            continue;
+        }
+        $length = mb_strlen((string) $value);
+        if (in_array($rule['input_type'] ?? '', ['text', 'textarea'], true)
+            && ((isset($rule['min_length']) && $length < (int) $rule['min_length'])
+            || (isset($rule['max_length']) && $length > (int) $rule['max_length']))) {
+            $errors[] = (string) $rule['label'] . ' tem um comprimento invalido.';
+        }
         $options = $rule['options'] ?? [];
 
-        if ($options !== []) {
+        if ($options !== [] || in_array($rule['input_type'] ?? '', ['select', 'font', 'color', 'position', 'technique'], true)) {
             $allowedValues = array_map(static fn (array $option): string => (string) $option['value'], $options);
 
             if (!in_array((string) $value, $allowedValues, true)) {

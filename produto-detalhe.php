@@ -50,6 +50,15 @@ $personalizationRules = !empty($product['is_personalizable'])
     : [];
 $productImages = catalog_product_images((int) $product['id']);
 $productVariations = catalog_product_variations((int) $product['id']);
+$availableStock = $productVariations !== [] ? array_sum(array_column($productVariations, 'stock')) : (int) $product['stock'];
+$missingRequiredOption = false;
+foreach ($personalizationRules as $rule) {
+    if (!empty($rule['is_required']) && in_array($rule['input_type'], ['select', 'font', 'color', 'position', 'technique'], true) && $rule['options'] === []) {
+        $missingRequiredOption = true;
+    }
+}
+$personalizationRules = array_values(array_filter($personalizationRules, static fn (array $rule): bool => !in_array($rule['input_type'], ['select', 'font', 'color', 'position', 'technique'], true) || $rule['options'] !== [] || !empty($rule['is_required'])));
+$canBuy = $availableStock > 0 && !$missingRequiredOption && (empty($product['is_personalizable']) || $personalizationRules !== []);
 $productReviews = reviews_for_product((int) $product['id']);
 $reviewSummary = review_summary_for_product((int) $product['id']);
 require_once __DIR__ . '/includes/header.php';
@@ -67,7 +76,7 @@ require_once __DIR__ . '/includes/header.php';
             <div class="col-lg-6">
                 <div class="product-gallery-main <?= $productImages !== [] ? 'has-image' : e($product['media_class'] ?? 'product-mug') ?>" data-personalization-preview>
                     <?php if ($productImages !== []): ?>
-                        <img src="<?= e(url((string) $productImages[0]['path'])) ?>" alt="<?= e((string) ($productImages[0]['alt_text'] ?: $product['name'])) ?>">
+                        <img data-gallery-main src="<?= e(url((string) $productImages[0]['path'])) ?>" alt="<?= e((string) ($productImages[0]['alt_text'] ?: $product['name'])) ?>">
                     <?php else: ?>
                         <span data-preview-product><?= e($product['category_name'] ?? 'Produto') ?></span>
                     <?php endif; ?>
@@ -76,15 +85,11 @@ require_once __DIR__ . '/includes/header.php';
                 </div>
                 <div class="product-gallery-thumbs mt-3">
                     <?php if ($productImages !== []): ?>
-                        <?php foreach (array_slice($productImages, 0, 3) as $image): ?>
-                            <button type="button" aria-label="<?= e((string) ($image['alt_text'] ?: $product['name'])) ?>">
+                        <?php foreach ($productImages as $imageIndex => $image): ?>
+                            <button type="button" data-gallery-thumb aria-pressed="<?= $imageIndex === 0 ? 'true' : 'false' ?>" aria-label="<?= e((string) ($image['alt_text'] ?: $product['name'])) ?>">
                                 <img src="<?= e(url((string) $image['path'])) ?>" alt="">
                             </button>
                         <?php endforeach; ?>
-                    <?php else: ?>
-                        <button type="button" aria-label="Imagem principal"></button>
-                        <button type="button" aria-label="Detalhe do produto"></button>
-                        <button type="button" aria-label="Personalizacao"></button>
                     <?php endif; ?>
                 </div>
             </div>
@@ -100,18 +105,16 @@ require_once __DIR__ . '/includes/header.php';
                 </div>
                 <div class="product-meta mb-4">
                     <span>SKU: <?= e($product['sku']) ?></span>
-                    <span>Stock: <?= e((string) $product['stock']) ?></span>
+                    <span><?= $availableStock > 0 ? 'Stock: ' . $availableStock : 'Esgotado' ?></span>
                     <span>IVA: <?= e((string) ($product['tax_rate'] ?? '23.00')) ?>%</span>
                 </div>
                 <?php if (!empty($product['is_personalizable'])): ?>
                     <div class="personalization-preview mb-4">
                         <h2 class="h5 fw-bold">Personalizacao disponivel</h2>
-                        <p class="text-secondary mb-3">Este produto permite texto, cor, fonte, tecnica, posicao e ficheiros de apoio.</p>
                         <div class="d-flex flex-wrap gap-2">
-                            <span class="badge badge-soft rounded-pill">Nome</span>
-                            <span class="badge badge-soft rounded-pill">Texto</span>
-                            <span class="badge badge-soft rounded-pill">Logotipo</span>
-                            <span class="badge badge-soft rounded-pill"><?= e($product['technique'] ?? 'Tecnica') ?></span>
+                            <?php foreach ($personalizationRules as $rule): ?>
+                                <span class="badge badge-soft rounded-pill"><?= e($rule['label']) ?></span>
+                            <?php endforeach; ?>
                         </div>
                     </div>
                 <?php endif; ?>
@@ -123,10 +126,10 @@ require_once __DIR__ . '/includes/header.php';
                     <?php if ($productVariations !== []): ?>
                         <div class="mb-4">
                             <label class="form-label" for="variation_id">Opcao do produto</label>
-                            <select class="form-select" id="variation_id" name="variation_id" data-variation-select>
+                            <select class="form-select" id="variation_id" name="variation_id" data-variation-select required>
                                 <option value="" data-price-delta="0">Escolher opcao</option>
                                 <?php foreach ($productVariations as $variation): ?>
-                                    <option value="<?= e((string) $variation['id']) ?>" data-price-delta="<?= e((string) $variation['price_delta']) ?>">
+                                    <option value="<?= e((string) $variation['id']) ?>" data-stock="<?= (int) $variation['stock'] ?>" data-price-delta="<?= e((string) $variation['price_delta']) ?>" <?= (int) $variation['stock'] <= 0 ? 'disabled' : '' ?>>
                                         <?= e((string) ($variation['attributes_label'] ?: $variation['sku'])) ?>
                                         <?php if ((float) $variation['price_delta'] !== 0.0): ?>
                                             <?= (float) $variation['price_delta'] > 0 ? '+' : '' ?><?= e(format_price((float) $variation['price_delta'])) ?>
@@ -157,7 +160,7 @@ require_once __DIR__ . '/includes/header.php';
                                             <?php endif; ?>
                                         </label>
                                         <?php if (in_array($rule['input_type'], ['select', 'font', 'position', 'technique'], true)): ?>
-                                            <select class="form-select" id="personalization-<?= e($rule['slug']) ?>" name="<?= e($fieldName) ?>" data-personalization-field data-preview-field="<?= e($rule['slug']) ?>" <?= !empty($rule['is_required']) ? 'required' : '' ?>>
+                                            <select class="form-select" id="personalization-<?= e($rule['slug']) ?>" name="<?= e($fieldName) ?>" data-base-extra-price="<?= e((string) $rule['base_extra_price']) ?>" data-personalization-field data-preview-field="<?= e($rule['slug']) ?>" <?= !empty($rule['is_required']) ? 'required' : '' ?>>
                                                 <option value="">Escolher</option>
                                                 <?php foreach ($rule['options'] as $option): ?>
                                                     <option value="<?= e($option['value']) ?>" data-extra-price="<?= e((string) $option['extra_price']) ?>">
@@ -172,19 +175,20 @@ require_once __DIR__ . '/includes/header.php';
                                             <div class="color-choice-group" data-personalization-field-group>
                                                 <?php foreach ($rule['options'] as $index => $option): ?>
                                                     <label class="color-choice" title="<?= e($option['label']) ?>">
-                                                        <input type="radio" name="<?= e($fieldName) ?>" value="<?= e($option['value']) ?>" data-personalization-field data-preview-field="<?= e($rule['slug']) ?>" data-extra-price="<?= e((string) $option['extra_price']) ?>" <?= $index === 0 ? 'checked' : '' ?>>
-                                                        <span style="background: <?= e($option['value']) ?>"></span>
+                                                        <?php $swatch = preg_match('/^#[0-9a-f]{6}$/iD', (string) ($option['color_hex'] ?: $option['value'])) ? ($option['color_hex'] ?: $option['value']) : '#777777'; ?>
+                                                        <input type="radio" aria-label="<?= e($option['label']) ?>" name="<?= e($fieldName) ?>" value="<?= e($option['value']) ?>" data-color="<?= e($swatch) ?>" data-base-extra-price="<?= e((string) $rule['base_extra_price']) ?>" data-personalization-field data-preview-field="<?= e($rule['slug']) ?>" data-extra-price="<?= e((string) $option['extra_price']) ?>" <?= !empty($rule['is_required']) ? 'required' : '' ?>>
+                                                        <span style="background: <?= e($swatch) ?>"></span>
                                                     </label>
                                                 <?php endforeach; ?>
                                             </div>
                                         <?php elseif ($rule['input_type'] === 'textarea'): ?>
-                                            <textarea class="form-control" id="personalization-<?= e($rule['slug']) ?>" name="<?= e($fieldName) ?>" rows="3" maxlength="<?= e((string) ($rule['max_length'] ?? 120)) ?>" data-personalization-field data-preview-field="<?= e($rule['slug']) ?>" data-base-extra-price="<?= e((string) $rule['base_extra_price']) ?>"></textarea>
+                                            <textarea class="form-control" id="personalization-<?= e($rule['slug']) ?>" name="<?= e($fieldName) ?>" rows="3" minlength="<?= (int) ($rule['min_length'] ?? 0) ?>" <?= isset($rule['max_length']) ? 'maxlength="' . (int) $rule['max_length'] . '"' : '' ?> data-personalization-field data-preview-field="<?= e($rule['slug']) ?>" data-base-extra-price="<?= e((string) $rule['base_extra_price']) ?>" <?= !empty($rule['is_required']) ? 'required' : '' ?>></textarea>
                                         <?php elseif ($rule['input_type'] === 'file'): ?>
-                                            <input class="form-control" id="personalization-<?= e($rule['slug']) ?>" name="personalization_file" type="file" accept=".png,.svg,.pdf,.jpg,.jpeg" data-personalization-file data-base-extra-price="<?= e((string) $rule['base_extra_price']) ?>">
+                                            <input class="form-control" id="personalization-<?= e($rule['slug']) ?>" name="personalization_file" type="file" accept=".png,.svg,.pdf,.jpg,.jpeg" data-preview-field="<?= e($rule['slug']) ?>" data-personalization-file data-base-extra-price="<?= e((string) $rule['base_extra_price']) ?>" <?= !empty($rule['is_required']) ? 'required' : '' ?>>
                                             <div class="form-text">PNG, SVG, PDF ou JPG ate <?= e((string) round(((int) ($rule['max_file_bytes'] ?? MAX_UPLOAD_BYTES)) / 1024 / 1024)) ?> MB.</div>
                                             <div class="form-text" data-upload-message></div>
                                         <?php else: ?>
-                                            <input class="form-control" id="personalization-<?= e($rule['slug']) ?>" name="<?= e($fieldName) ?>" type="text" maxlength="<?= e((string) ($rule['max_length'] ?? 80)) ?>" data-personalization-field data-preview-field="<?= e($rule['slug']) ?>" data-base-extra-price="<?= e((string) $rule['base_extra_price']) ?>" <?= !empty($rule['is_required']) ? 'required' : '' ?>>
+                                            <input class="form-control" id="personalization-<?= e($rule['slug']) ?>" name="<?= e($fieldName) ?>" type="text" minlength="<?= (int) ($rule['min_length'] ?? 0) ?>" <?= isset($rule['max_length']) ? 'maxlength="' . (int) $rule['max_length'] . '"' : '' ?> data-personalization-field data-preview-field="<?= e($rule['slug']) ?>" data-base-extra-price="<?= e((string) $rule['base_extra_price']) ?>" <?= !empty($rule['is_required']) ? 'required' : '' ?>>
                                         <?php endif; ?>
                                     </div>
                                 <?php endforeach; ?>
@@ -193,8 +197,8 @@ require_once __DIR__ . '/includes/header.php';
                     <?php endif; ?>
                     <div class="d-flex flex-column flex-sm-row gap-2 mb-4">
                         <input class="form-control quantity-input" name="quantity" type="number" min="1" value="1" aria-label="Quantidade">
-                        <button class="btn btn-dark px-4" type="submit">Adicionar ao carrinho</button>
-                        <button class="btn btn-outline-dark" type="button">Wishlist</button>
+                        <button class="btn btn-dark px-4" type="submit" data-buy-button <?= !$canBuy ? 'disabled' : '' ?>><?= $canBuy ? 'Adicionar ao carrinho' : 'Temporariamente indisponivel' ?></button>
+                        <button class="btn btn-outline-dark" type="submit" formaction="<?= e(url('api/wishlist.php')) ?>" formnovalidate>Guardar / remover favorito</button>
                     </div>
                     <div class="total-preview mb-4">
                         <span>Total estimado</span>

@@ -82,6 +82,9 @@ function review_summary_for_product(int $productId): array
 function review_find_product_id(string $value): ?int
 {
     $value = trim($value);
+    if (filter_var($value, FILTER_VALIDATE_URL)) {
+        $value = rawurldecode(basename((string) parse_url($value, PHP_URL_PATH)));
+    }
 
     if ($value === '') {
         return null;
@@ -91,13 +94,14 @@ function review_find_product_id(string $value): ?int
         $stmt = db()->prepare(
             'SELECT id
              FROM products
-             WHERE id = :id OR sku = :value OR slug = :value OR name LIKE :name
+             WHERE id = :id OR sku = :value OR slug = :slug OR name LIKE :name
              ORDER BY is_active DESC, id ASC
              LIMIT 1'
         );
         $stmt->execute([
             'id' => ctype_digit($value) ? (int) $value : 0,
             'value' => $value,
+            'slug' => $value,
             'name' => '%' . $value . '%',
         ]);
         $id = $stmt->fetchColumn();

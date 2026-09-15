@@ -19,7 +19,12 @@ function checkout_shipping_methods(): array
         'free_shipping' => ['name' => 'Portes gratuitos', 'price' => 0.00],
     ];
 
-    return store_active_methods('shipping_methods', $fallback);
+    $methods = store_active_methods('shipping_methods', $fallback);
+    if (cart_totals()['subtotal'] < (float) store_setting('free_shipping_threshold', '75')
+        && (cart()['coupon']['type'] ?? '') !== 'free_shipping') {
+        unset($methods['free_shipping']);
+    }
+    return $methods;
 }
 
 function checkout_payment_methods(): array
@@ -56,6 +61,16 @@ function checkout_validate(array $data): array
         $errors[] = 'E necessario aceitar a politica RGPD.';
     }
 
+    if (empty($data['same_billing'])) {
+        foreach (['first_name', 'last_name', 'address_line_1', 'postal_code', 'city'] as $field) {
+            if (trim((string) ($data['shipping_' . $field] ?? '')) === '') {
+                $errors[] = 'Preenche todos os dados da morada de entrega.';
+                break;
+            }
+        }
+    }
+    $errors = array_merge($errors, cart_inventory_errors(cart()['items']));
+
     if (!isset(checkout_shipping_methods()[$data['shipping_method'] ?? ''])) {
         $errors[] = 'Metodo de envio invalido.';
     }
@@ -81,10 +96,9 @@ function checkout_prepare_order(array $data): array
 
     $freeShippingThreshold = (float) store_setting('free_shipping_threshold', '75');
 
-    if (($cart['coupon']['type'] ?? '') !== 'free_shipping' && $totals['subtotal'] < $freeShippingThreshold) {
-        $totals['shipping'] = (float) $shippingMethod['price'];
-        $totals['total'] = max(0, $totals['subtotal'] - $totals['discount'] + $totals['shipping']);
-    }
+    $totals['shipping'] = ($cart['coupon']['type'] ?? '') === 'free_shipping' || $totals['subtotal'] >= $freeShippingThreshold
+        ? 0.0 : (float) $shippingMethod['price'];
+    $totals['total'] = max(0, $totals['subtotal'] - $totals['discount'] + $totals['shipping']);
 
     return [
         'order_number' => checkout_order_number(),
@@ -140,10 +154,57 @@ function checkout_store_order(array $order): array
     try {
         $pdo = db();
         $pdo->beginTransaction();
+        if (!$pdo->query("SHOW TRIGGERS LIKE 'stock_movements'")->fetch()) {
+            throw new RuntimeException('Stock trigger is missing');
+        }
+
+        if ($order['items'] === []) {
+            throw new RuntimeException('Empty order');
+        }
+        // Lock in a stable order; each stock movement is applied by the database trigger.
+        $stockItems = $order['items'];
+        usort($stockItems, static fn (array $a, array $b): int => [$a['product_id'], $a['variation_id'] ?? 0] <=> [$b['product_id'], $b['variation_id'] ?? 0]);
+        foreach ($stockItems as $item) {
+            $lock = $pdo->prepare('SELECT id FROM products WHERE id = :id AND is_active = 1 FOR UPDATE');
+            $lock->execute(['id' => $item['product_id']]);
+            if (!$lock->fetchColumn()) {
+                throw new DomainException('Um produto deixou de estar disponivel. Revê o carrinho.');
+            }
+            if (!empty($item['variation_id'])) {
+                $lock = $pdo->prepare('SELECT id FROM product_variations WHERE id = :id AND product_id = :product_id AND is_active = 1 FOR UPDATE');
+                $lock->execute(['id' => $item['variation_id'], 'product_id' => $item['product_id']]);
+                if (!$lock->fetchColumn()) {
+                    throw new DomainException('Uma opcao deixou de estar disponivel. Revê o carrinho.');
+                }
+            }
+            $product = catalog_product_by_id((int) $item['product_id']);
+            $variation = !empty($item['variation_id']) ? catalog_product_variation((int) $item['product_id'], (int) $item['variation_id']) : null;
+            $rules = !empty($product['is_personalizable']) ? personalization_rules_for_product((int) $item['product_id']) : [];
+            if (personalization_validate_values($rules, $item['personalization']) !== []
+                || abs((float) $item['unit_price'] - ((float) $product['final_price'] + (float) ($variation['price_delta'] ?? 0))) > 0.001
+                || abs((float) $item['personalization_total'] - personalization_calculate_total($rules, $item['personalization'])) > 0.001) {
+                throw new DomainException('O preco ou a personalizacao mudou. Remove o artigo e adiciona-o novamente ao carrinho.');
+            }
+        }
+        $inventoryErrors = cart_inventory_errors($stockItems);
+        if ($inventoryErrors !== []) {
+            throw new DomainException(implode(' ', $inventoryErrors));
+        }
 
         $paymentId = checkout_lookup_id('payment_methods', $order['payment_method']['code']);
         $shippingId = checkout_lookup_id('shipping_methods', $order['shipping_method']['code']);
+        if (!$paymentId || !$shippingId || !isset(checkout_payment_methods()[$order['payment_method']['code']])) {
+            throw new DomainException('O metodo de pagamento ou envio deixou de estar disponivel. Escolhe outro.');
+        }
         $couponId = null;
+        if (!empty($order['coupon'])) {
+            $coupon = cart_find_coupon($order['coupon']['code'], (float) $order['totals']['subtotal'], true);
+            if (!$coupon || $coupon['type'] !== $order['coupon']['type'] || $coupon['value'] !== (float) $order['coupon']['value']) {
+                throw new DomainException('O cupao ja nao e valido. Retira-o ou aplica outro no carrinho.');
+            }
+            $couponId = $coupon['id'];
+            $pdo->prepare('UPDATE coupons SET used_count = used_count + 1 WHERE id = :id')->execute(['id' => $couponId]);
+        }
 
         $stmt = $pdo->prepare(
             'INSERT INTO orders (
@@ -198,27 +259,32 @@ function checkout_store_order(array $order): array
                 'quantity' => $item['quantity'],
                 'unit_price' => $item['unit_price'],
                 'personalization_total' => $item['personalization_total'],
-                'tax_rate' => 23.00,
+                'tax_rate' => (float) ($item['tax_rate'] ?? 23),
                 'line_total' => $lineTotal,
             ]);
 
             $orderItemId = (int) $pdo->lastInsertId();
             checkout_store_order_item_personalizations($orderItemId, $item);
+            $movement = $pdo->prepare('INSERT INTO stock_movements (product_id, variation_id, user_id, type, quantity, reason, reference_type, reference_id) VALUES (:product, :variation, :user, "reservation", :quantity, "Reserva de encomenda", "order", :order_id)');
+            $movement->execute(['product' => $item['product_id'], 'variation' => $item['variation_id'] ?? null, 'user' => $_SESSION['user_id'] ?? null, 'quantity' => -(int) $item['quantity'], 'order_id' => $orderId]);
         }
 
         $order['payment'] = payment_create_for_order($orderId, $order);
         $pdo->commit();
         $order['id'] = $orderId;
+        $order['user_id'] = $_SESSION['user_id'] ?? null;
         $order['persisted'] = true;
 
         return $order;
-    } catch (Throwable) {
+    } catch (Throwable $exception) {
         if (isset($pdo) && $pdo->inTransaction()) {
             $pdo->rollBack();
         }
 
         $order['id'] = null;
         $order['persisted'] = false;
+        $order['error'] = $exception instanceof DomainException ? $exception->getMessage() : 'Nao foi possivel guardar a encomenda. O carrinho foi mantido. Tenta novamente.';
+        error_log('Checkout failed: ' . $exception->getMessage());
 
         return $order;
     }
@@ -232,7 +298,7 @@ function checkout_lookup_id(string $table, string $code): ?int
         return null;
     }
 
-    $stmt = db()->prepare('SELECT id FROM ' . $table . ' WHERE code = :code LIMIT 1');
+    $stmt = db()->prepare('SELECT id FROM ' . $table . ' WHERE code = :code AND is_active = 1 LIMIT 1');
     $stmt->execute(['code' => $code]);
     $id = $stmt->fetchColumn();
 

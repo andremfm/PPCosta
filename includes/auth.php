@@ -41,9 +41,6 @@ function register_user(array $data): int
     $pdo->beginTransaction();
 
     try {
-        $countStmt = $pdo->query('SELECT COUNT(*) FROM users');
-        $isFirstUser = ((int) $countStmt->fetchColumn()) === 0;
-
         $stmt = $pdo->prepare(
             'INSERT INTO users (first_name, last_name, email, phone, password_hash, status, newsletter_opt_in)
              VALUES (:first_name, :last_name, :email, :phone, :password_hash, :status, :newsletter_opt_in)'
@@ -59,7 +56,7 @@ function register_user(array $data): int
         ]);
 
         $userId = (int) $pdo->lastInsertId();
-        $roleSlugs = $isFirstUser ? ['customer', 'admin'] : ['customer'];
+        $roleSlugs = ['customer'];
         $roleStmt = $pdo->prepare('SELECT id FROM roles WHERE slug = :slug LIMIT 1');
         $assignStmt = $pdo->prepare('INSERT INTO user_roles (user_id, role_id) VALUES (:user_id, :role_id)');
 
@@ -195,7 +192,12 @@ function current_user(): ?array
     }
 
     try {
-        return find_user_by_id((int) $_SESSION['user_id']);
+        $user = find_user_by_id((int) $_SESSION['user_id']);
+        if (!$user || !in_array($user['status'], ['active', 'pending'], true)) {
+            unset($_SESSION['user_id'], $_SESSION['user_roles']);
+            return null;
+        }
+        return $user;
     } catch (Throwable) {
         return null;
     }
@@ -208,7 +210,15 @@ function is_logged_in(): bool
 
 function has_role(string $role): bool
 {
-    return in_array($role, $_SESSION['user_roles'] ?? [], true);
+    $user = current_user();
+    if (!$user) {
+        return false;
+    }
+    try {
+        return in_array($role, user_roles((int) $user['id']), true);
+    } catch (Throwable) {
+        return false;
+    }
 }
 
 function require_auth(): void

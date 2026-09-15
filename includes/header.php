@@ -51,12 +51,13 @@ foreach (($_SESSION['cart']['items'] ?? []) as $cartItem) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="<?= e(versioned_asset('css/main.css')) ?>">
     <?php if (!empty($seoMeta['schema'])): ?>
-        <script type="application/ld+json"><?= json_encode($seoMeta['schema'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?></script>
+        <script type="application/ld+json"><?= json_encode($seoMeta['schema'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
     <?php endif; ?>
 </head>
 <body>
 <script>
-    window.PPCOSTA_BASE_URL = '<?= e(url()) ?>';
+    window.PPCOSTA_BASE_URL = <?= json_encode(rtrim(url(), '/'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    window.PPCOSTA_CSRF_TOKEN = <?= json_encode(csrf_token()) ?>;
 </script>
 <header class="site-header">
     <nav class="navbar navbar-expand-lg bg-white border-bottom fixed-top">

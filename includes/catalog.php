@@ -218,7 +218,8 @@ function catalog_products(array $filters = []): array
         $params = [];
 
         if (!empty($filters['q'])) {
-            $where[] = '(p.name LIKE :q OR p.short_description LIKE :q OR p.sku LIKE :q)';
+            $where[] = '(p.name LIKE :q OR p.short_description LIKE :q_description OR p.sku LIKE :q_sku)';
+            $params['q_description'] = $params['q_sku'] = '%' . trim((string) $filters['q']) . '%';
             $params['q'] = '%' . $filters['q'] . '%';
         }
 

@@ -17,15 +17,16 @@ if (request_method() === 'POST') {
     }
 
     try {
+        if (!rate_limit_allow('reset|' . ($_SERVER['REMOTE_ADDR'] ?? 'local'), 5, 900)) {
+            flash('warning', 'Aguarda alguns minutos antes de voltar a pedir a recuperacao.');
+            redirect('recuperar-password.php');
+        }
         $token = create_password_reset($email);
         if ($token) {
             mailer_send_password_reset($email, $token);
         }
         flash('success', 'Se o email existir, receberas instrucoes para definir uma nova password.');
 
-        if ($token && APP_ENV === 'development') {
-            flash('info', 'Link de desenvolvimento: ' . url('reset-password.php?token=' . urlencode($token)));
-        }
     } catch (Throwable) {
         flash('danger', 'Nao foi possivel processar o pedido. Confirma a base de dados.');
     }

@@ -13,10 +13,11 @@ if (request_method() === 'POST') {
     }
 
     $action = $_POST['action'] ?? '';
+    try {
 
     if ($action === 'profile') {
-        customer_update_profile($userId, $_POST);
-        flash('success', 'Perfil atualizado.');
+        $saved = customer_update_profile($userId, $_POST);
+        flash($saved ? 'success' : 'danger', $saved ? 'Perfil atualizado.' : 'Nao foi possivel guardar o perfil. Tenta novamente.');
         redirect('perfil.php#perfil');
     }
 
@@ -59,6 +60,11 @@ if (request_method() === 'POST') {
         customer_save_review($userId, $_POST);
         flash('success', 'Avaliacao recebida e pendente de moderacao.');
         redirect('perfil.php#avaliacoes');
+    }
+    } catch (Throwable $exception) {
+        error_log('Customer update failed: ' . $exception->getMessage());
+        flash('danger', $exception instanceof DomainException ? $exception->getMessage() : 'Nao foi possivel guardar os dados. Tenta novamente.');
+        redirect('perfil.php');
     }
 }
 
@@ -248,6 +254,7 @@ require_once __DIR__ . '/includes/header.php';
 
                 <section id="wishlist" class="account-panel">
                     <h2 class="h4 fw-bold mb-3">Wishlist</h2>
+                    <?php if ($wishlist === []): ?><p class="text-secondary">Ainda nao tens produtos favoritos.</p><?php endif; ?>
                     <div class="row g-3">
                         <?php foreach ($wishlist as $item): ?>
                             <div class="col-md-4">
@@ -255,6 +262,12 @@ require_once __DIR__ . '/includes/header.php';
                                     <span><strong><?= e($item['name']) ?></strong><small><?= e($item['sku']) ?></small></span>
                                     <b><?= e(format_price((float) $item['final_price'])) ?></b>
                                 </a>
+                                <form method="post" action="<?= e(url('api/wishlist.php')) ?>" class="mt-2">
+                                    <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                                    <input type="hidden" name="product_id" value="<?= (int) $item['id'] ?>">
+                                    <input type="hidden" name="return_to" value="perfil">
+                                    <button class="btn btn-sm btn-outline-danger" type="submit">Remover favorito</button>
+                                </form>
                             </div>
                         <?php endforeach; ?>
                     </div>

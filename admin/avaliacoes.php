@@ -18,8 +18,12 @@ if (request_method() === 'POST') {
 
     if (($_POST['action'] ?? '') === 'save') {
         $reviewId = (int) ($_POST['id'] ?? 0);
-        admin_review_update($reviewId, (string) ($_POST['status'] ?? ''), (string) ($_POST['admin_reply'] ?? ''));
-        flash('success', 'Avaliacao atualizada.');
+        try {
+            admin_review_update($reviewId, (string) ($_POST['status'] ?? ''), (string) ($_POST['admin_reply'] ?? ''));
+            flash('success', 'Avaliacao atualizada.');
+        } catch (Throwable) {
+            flash('danger', 'Nao foi possivel atualizar a avaliacao.');
+        }
         redirect('admin/avaliacoes.php?view=' . urlencode((string) $reviewId));
     }
 }

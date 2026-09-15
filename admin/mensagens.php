@@ -19,6 +19,7 @@ if (request_method() === 'POST') {
 
     $threadId = (int) ($_POST['id'] ?? 0);
     $action = $_POST['action'] ?? '';
+    try {
 
     if ($action === 'reply') {
         $body = trim((string) ($_POST['body'] ?? ''));
@@ -37,6 +38,10 @@ if (request_method() === 'POST') {
         admin_message_update_status($threadId, (string) ($_POST['status'] ?? ''));
         flash('success', 'Estado da mensagem atualizado.');
         redirect('admin/mensagens.php?view=' . urlencode((string) $threadId));
+    }
+    } catch (Throwable) {
+        flash('danger', 'Nao foi possivel guardar a mensagem. Tenta novamente.');
+        redirect('admin/mensagens.php?view=' . (int) $threadId);
     }
 }
 

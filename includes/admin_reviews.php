@@ -15,7 +15,8 @@ function admin_reviews_all(array $filters = []): array
     }
 
     if (!empty($filters['q'])) {
-        $where[] = '(p.name LIKE :q OR p.sku LIKE :q OR r.title LIKE :q OR r.comment LIKE :q OR u.email LIKE :q)';
+        $where[] = '(p.name LIKE :q OR p.sku LIKE :q_sku OR r.title LIKE :q_title OR r.comment LIKE :q_comment OR u.email LIKE :q_email)';
+        $params['q_sku'] = $params['q_title'] = $params['q_comment'] = $params['q_email'] = '%' . $filters['q'] . '%';
         $params['q'] = '%' . $filters['q'] . '%';
     }
 

@@ -5,7 +5,7 @@ require_once __DIR__ . '/includes/payments.php';
 
 $order = $_SESSION['last_order'] ?? null;
 
-if (!$order) {
+if (!$order || empty($order['persisted'])) {
     redirect('produto.php');
 }
 

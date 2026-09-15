@@ -17,7 +17,7 @@ function admin_personalization_types(): array
     try {
         return db()->query('SELECT * FROM personalization_types ORDER BY id ASC')->fetchAll();
     } catch (Throwable) {
-        return personalization_fallback_rules();
+        return [];
     }
 }
 
@@ -44,7 +44,7 @@ function admin_personalization_save_type(array $data): void
     $allowedTypes = ['text', 'textarea', 'select', 'color', 'font', 'file', 'position', 'technique'];
 
     if ($name === '' || !in_array($inputType, $allowedTypes, true)) {
-        return;
+        throw new DomainException('Tipo de personalizacao invalido.');
     }
 
     if ($id > 0) {
@@ -85,7 +85,7 @@ function admin_personalization_save_option(array $data): void
     $value = trim((string) ($data['value'] ?? ''));
 
     if ($typeId <= 0 || $label === '' || $value === '') {
-        return;
+        throw new DomainException('Opcao de personalizacao invalida.');
     }
 
     $params = [

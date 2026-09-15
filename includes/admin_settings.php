@@ -38,6 +38,11 @@ function admin_settings_groups(): array
 
 function admin_settings_save(array $data): void
 {
+    foreach (['default_tax_rate', 'free_shipping_threshold'] as $field) {
+        if (isset($data[$field]) && (!is_numeric($data[$field]) || (float) $data[$field] < 0)) throw new DomainException('Indica valores numericos positivos.');
+    }
+    if (isset($data['default_tax_rate']) && (float) $data['default_tax_rate'] > 100) throw new DomainException('Taxa de IVA invalida.');
+    if (isset($data['currency']) && strtoupper(trim((string) $data['currency'])) !== 'EUR') throw new DomainException('A moeda suportada pela loja e EUR.');
     $definitions = store_setting_defaults();
     $stmt = db()->prepare(
         'INSERT INTO settings (setting_key, setting_value, value_type, is_public)
@@ -48,6 +53,9 @@ function admin_settings_save(array $data): void
             is_public = VALUES(is_public)'
     );
 
+    $pdo = db();
+    $pdo->beginTransaction();
+    try {
     foreach ($definitions as $key => $definition) {
         if (!array_key_exists($key, $data)) {
             continue;
@@ -59,6 +67,11 @@ function admin_settings_save(array $data): void
             'value_type' => $definition['type'],
             'is_public' => (int) $definition['public'],
         ]);
+    }
+    $pdo->commit();
+    } catch (Throwable $exception) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $exception;
     }
 }
 

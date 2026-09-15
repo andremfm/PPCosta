@@ -275,6 +275,7 @@ CREATE TABLE product_personalizations (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     product_id BIGINT UNSIGNED NOT NULL,
     personalization_type_id BIGINT UNSIGNED NOT NULL,
+    options_mode ENUM('legacy','all','selected') NOT NULL DEFAULT 'legacy',
     label VARCHAR(160) NOT NULL,
     min_length INT NULL,
     max_length INT NULL,
@@ -293,6 +294,7 @@ CREATE TABLE product_personalizations (
 CREATE TABLE product_personalization_options (
     product_personalization_id BIGINT UNSIGNED NOT NULL,
     personalization_option_id BIGINT UNSIGNED NOT NULL,
+    extra_price DECIMAL(12,2) NULL DEFAULT NULL CHECK (extra_price IS NULL OR extra_price >= 0),
     PRIMARY KEY (product_personalization_id, personalization_option_id),
     CONSTRAINT fk_product_personalization_options_rule FOREIGN KEY (product_personalization_id) REFERENCES product_personalizations(id) ON DELETE CASCADE,
     CONSTRAINT fk_product_personalization_options_option FOREIGN KEY (personalization_option_id) REFERENCES personalization_options(id) ON DELETE CASCADE

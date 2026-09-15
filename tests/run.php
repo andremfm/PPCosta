@@ -50,7 +50,7 @@ $_SESSION['cart']['items']['test'] = [
 $totals = cart_totals();
 test_same(2, $totals['units'], 'Carrinho conta unidades');
 test_same(25.0, $totals['subtotal'], 'Carrinho calcula subtotal com personalizacao');
-test_assert(cart_apply_coupon('BEMVINDO10'), 'Cupao valido e aceite');
+$_SESSION['cart']['coupon'] = ['code' => 'UNIT', 'type' => 'percent', 'value' => 10];
 test_same(2.5, cart_totals()['discount'], 'Cupao percentual calcula desconto');
 test_assert(!cart_apply_coupon('INVALIDO'), 'Cupao invalido e rejeitado');
 

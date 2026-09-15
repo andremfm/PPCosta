@@ -5,6 +5,10 @@ require_once __DIR__ . '/includes/routing.php';
 
 $rawPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 $path = route_normalize_path($rawPath);
+if (route_is_private($path)) {
+    http_response_code(404);
+    exit('Pagina nao encontrada.');
+}
 $file = __DIR__ . $path;
 
 if ($path !== '/' && is_file($file)) {

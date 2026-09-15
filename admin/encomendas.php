@@ -19,8 +19,13 @@ if (request_method() === 'POST') {
 
     if (($_POST['action'] ?? '') === 'status') {
         $orderId = (string) ($_POST['id'] ?? '');
-        admin_order_update_status($orderId, (string) ($_POST['status'] ?? ''), (string) ($_POST['note'] ?? ''));
-        flash('success', 'Estado da encomenda atualizado.');
+        try {
+            admin_order_update_status($orderId, (string) ($_POST['status'] ?? ''), (string) ($_POST['note'] ?? ''));
+            flash('success', 'Estado da encomenda atualizado.');
+        } catch (Throwable $exception) {
+            error_log('Order status failed: ' . $exception->getMessage());
+            flash('danger', $exception instanceof DomainException ? $exception->getMessage() : 'Nao foi possivel atualizar a encomenda.');
+        }
         redirect('admin/encomendas.php?view=' . urlencode((string) $orderId));
     }
 }
@@ -148,7 +153,19 @@ require_once __DIR__ . '/includes/header.php';
                     <tbody>
                     <?php foreach ($items as $item): ?>
                         <tr>
-                            <td><?= e((string) ($item['product_name'] ?? $item['name'] ?? 'Produto')) ?></td>
+                            <td>
+                                <?= e((string) ($item['product_name'] ?? $item['name'] ?? 'Produto')) ?>
+                                <?php foreach (admin_order_item_personalizations((int) ($item['id'] ?? 0)) as $detail): ?>
+                                    <small class="d-block mt-1">
+                                        <?= e((string) $detail['label']) ?>:
+                                        <?php if (!empty($detail['file_path'])): ?>
+                                            <a href="<?= e(url('api/personalization-download.php?id=' . (int) $detail['id'])) ?>">Descarregar ficheiro</a>
+                                        <?php else: ?>
+                                            <?= e((string) $detail['value_text']) ?>
+                                        <?php endif; ?>
+                                    </small>
+                                <?php endforeach; ?>
+                            </td>
                             <td><?= e((string) ($item['sku'] ?? '')) ?></td>
                             <td><?= e((string) ($item['quantity'] ?? 1)) ?></td>
                             <td><?= e(format_price((float) ($item['line_total'] ?? (((float) ($item['unit_price'] ?? 0) + (float) ($item['personalization_total'] ?? 0)) * (int) ($item['quantity'] ?? 1))))) ?></td>

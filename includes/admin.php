@@ -32,7 +32,7 @@ function admin_dashboard_metrics(): array
         ['label' => 'Clientes', 'value' => (string) admin_metric_value('SELECT COUNT(*) FROM users', 0), 'tone' => 'customers'],
         ['label' => 'Produtos', 'value' => (string) admin_metric_value('SELECT COUNT(*) FROM products', count($fallbackProducts)), 'tone' => 'products'],
         ['label' => 'Stock', 'value' => (string) admin_metric_value('SELECT COALESCE(SUM(stock), 0) FROM products', $fallbackStock), 'tone' => 'stock'],
-        ['label' => 'Lucro estimado', 'value' => format_price((float) admin_metric_value('SELECT COALESCE(SUM((price - COALESCE(cost_price, 0)) * stock), 0) FROM products', 0)), 'tone' => 'profit'],
+        ['label' => 'Margem estimada dos artigos', 'value' => format_price((float) admin_metric_value('SELECT COALESCE(SUM((oi.unit_price - COALESCE(p.cost_price, 0)) * oi.quantity), 0) FROM order_items oi INNER JOIN orders o ON o.id = oi.order_id LEFT JOIN products p ON p.id = oi.product_id WHERE o.status NOT IN ("cancelled", "refunded")', 0)), 'tone' => 'profit'],
     ];
 }
 

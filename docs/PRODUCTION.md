@@ -55,7 +55,7 @@ Abrir `https://dominio-final/api/health.php` e confirmar:
 - Confirmar HTTPS ativo.
 - Confirmar permissao de escrita em `uploads/`.
 - Confirmar que `/includes`, `/database`, `/admin` e `/api` seguem as regras de acesso pretendidas.
-- Criar a primeira conta; essa conta recebe permissao de administrador.
+- Criar a conta e atribuir explicitamente o papel `admin` na tabela `user_roles`, por um operador com acesso autorizado a base de dados. O registo publico atribui apenas `customer`.
 - Testar checkout completo.
 - Testar upload de personalizacao.
 - Submeter `sitemap.php` ou `sitemap.xml` na Search Console.

@@ -1,5 +1,9 @@
 Options -Indexes -MultiViews
 RewriteEngine On
+RewriteRule (^|/)\. - [F,L]
+RewriteRule ^(includes|database|tests|docs|admin/includes)(/|$) - [F,L,NC]
+RewriteRule ^uploads/(mail|personalizations)(/|$) - [F,L,NC]
+RewriteRule \.(sql|eml|md|log|toml|ini)$ - [F,L,NC]
 
 RewriteRule ^produto/([a-zA-Z0-9-]+)/?$ produto-detalhe.php?slug=$1 [L,QSA]
 RewriteRule ^categoria/([a-zA-Z0-9-]+)/?$ produto.php?categoria=$1 [L,QSA]

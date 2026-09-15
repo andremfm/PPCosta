@@ -1,13 +1,19 @@
 <?php
 declare(strict_types=1);
+
+require_once __DIR__ . '/settings.php';
+
+$footerSettings = store_settings_all();
+$footerStoreName = $footerSettings['store_name'] ?? APP_NAME;
 ?>
 </main>
 <footer class="footer-section border-top">
     <div class="container py-5">
         <div class="row g-4">
             <div class="col-md-3">
-                <h2 class="h5 fw-bold"><?= e(APP_NAME) ?></h2>
-                <p class="text-secondary mb-0">Artigos personalizados para bebe, casa, empresas e presentes especiais.</p>
+                <h2 class="h5 fw-bold"><?= e($footerStoreName) ?></h2>
+                <p class="text-secondary mb-2">Artigos personalizados para bebe, casa, empresas e presentes especiais.</p>
+                <p class="text-secondary small mb-0"><?= e((string) ($footerSettings['store_address'] ?? '')) ?></p>
             </div>
             <div class="col-md-2">
                 <h3 class="h6 fw-semibold">Loja</h3>
@@ -22,13 +28,15 @@ declare(strict_types=1);
                 <a href="<?= e(url('perfil.php')) ?>" class="footer-link">Area cliente</a>
             </div>
             <div class="col-md-2">
-                <h3 class="h6 fw-semibold">Social</h3>
-                <a href="#" class="footer-link">Instagram</a>
-                <a href="#" class="footer-link">Facebook</a>
-                <a href="#" class="footer-link">Pinterest</a>
+                <h3 class="h6 fw-semibold">Ajuda</h3>
+                <a href="<?= e(url('contactos')) ?>" class="footer-link">Contactos</a>
+                <a href="<?= e(url('termos')) ?>" class="footer-link">Termos</a>
+                <a href="<?= e(url('privacidade')) ?>" class="footer-link">Privacidade</a>
+                <a href="<?= e(url('devolucoes')) ?>" class="footer-link">Trocas e devolucoes</a>
             </div>
             <div class="col-md-3">
                 <h3 class="h6 fw-semibold">Newsletter</h3>
+                <p class="text-secondary small mb-2"><?= e((string) ($footerSettings['store_email'] ?? '')) ?> · <?= e((string) ($footerSettings['store_phone'] ?? '')) ?></p>
                 <form class="newsletter-form" data-newsletter-form>
                     <label class="visually-hidden" for="newsletter-email">Email</label>
                     <div class="input-group">
@@ -40,8 +48,8 @@ declare(strict_types=1);
             </div>
         </div>
         <div class="footer-bottom d-flex flex-column flex-md-row justify-content-between gap-2 pt-4 mt-4 border-top">
-            <span>&copy; <?= date('Y') ?> <?= e(APP_NAME) ?>. Todos os direitos reservados.</span>
-            <span>RGPD | Termos | Privacidade</span>
+            <span>&copy; <?= date('Y') ?> <?= e($footerStoreName) ?>. Todos os direitos reservados.</span>
+            <span><a href="<?= e(url('privacidade')) ?>">RGPD</a> | <a href="<?= e(url('termos')) ?>">Termos</a> | <a href="<?= e(url('privacidade')) ?>">Privacidade</a></span>
         </div>
     </div>
 </footer>

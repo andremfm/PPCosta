@@ -20,6 +20,17 @@ if (preg_match('#^/categoria/([a-zA-Z0-9-]+)/?$#', $path, $matches)) {
     return true;
 }
 
+if (preg_match('#^/(termos|privacidade|devolucoes)/?$#', $path, $matches)) {
+    $_GET['slug'] = $matches[1];
+    require __DIR__ . '/pagina.php';
+    return true;
+}
+
+if ($path === '/contactos' || $path === '/contactos/') {
+    require __DIR__ . '/contactos.php';
+    return true;
+}
+
 if ($path === '/sitemap.xml') {
     require __DIR__ . '/sitemap.php';
     return true;

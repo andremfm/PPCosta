@@ -810,6 +810,64 @@ body {
     font-size: 0.92rem;
 }
 
+.footer-bottom a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.footer-bottom a:hover {
+    color: var(--color-ink);
+}
+
+.content-page,
+.content-card {
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-sm);
+    background: #fff;
+}
+
+.content-page {
+    max-width: 860px;
+    padding: 34px;
+    color: #334155;
+    line-height: 1.8;
+}
+
+.content-card {
+    padding: 28px;
+}
+
+.contact-list {
+    display: grid;
+    gap: 14px;
+}
+
+.contact-list article {
+    display: grid;
+    gap: 3px;
+    border-bottom: 1px solid var(--color-line);
+    padding-bottom: 14px;
+}
+
+.contact-list article:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+}
+
+.contact-list span {
+    color: var(--color-muted);
+    font-size: 0.84rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.contact-list a,
+.contact-list strong {
+    color: var(--color-ink);
+    font-weight: 700;
+    text-decoration: none;
+}
+
 .admin-layout {
     min-height: 100vh;
     background: var(--color-soft);

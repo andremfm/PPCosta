@@ -8,6 +8,10 @@ header('Content-Type: application/xml; charset=utf-8');
 $urls = [
     ['loc' => url(), 'priority' => '1.0', 'changefreq' => 'daily'],
     ['loc' => url('produto.php'), 'priority' => '0.9', 'changefreq' => 'daily'],
+    ['loc' => url('contactos'), 'priority' => '0.6', 'changefreq' => 'monthly'],
+    ['loc' => url('termos'), 'priority' => '0.4', 'changefreq' => 'monthly'],
+    ['loc' => url('privacidade'), 'priority' => '0.4', 'changefreq' => 'monthly'],
+    ['loc' => url('devolucoes'), 'priority' => '0.4', 'changefreq' => 'monthly'],
     ['loc' => url('login.php'), 'priority' => '0.3', 'changefreq' => 'monthly'],
     ['loc' => url('register.php'), 'priority' => '0.3', 'changefreq' => 'monthly'],
 ];
